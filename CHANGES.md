@@ -1,5 +1,8 @@
 # Future
 
+# 1.19.1
+- (WASAPI) Only write when running and fix deadlock
+
 # 1.19.0
 - AI: Revert AI translation to previous version (fix for translation not working with HW rendered cores)
 - APPLE: Try to use system preferred language
