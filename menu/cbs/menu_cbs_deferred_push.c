@@ -302,18 +302,18 @@ static int deferred_push_cursor_manager_list_deferred(
    const char *path               = info->path;
    settings_t *settings           = NULL;
    config_file_t *conf            = NULL;
-   struct config_entry_list 
+   struct config_entry_list
       *query_entry                = NULL;
-   struct config_entry_list 
+   struct config_entry_list
       *rdb_entry                  = NULL;
-   
+
    if (!(conf = config_file_new_from_path_to_string(path)))
       return -1;
-   
+
    query_entry                    = config_get_entry(conf, "query");
    rdb_entry                      = config_get_entry(conf, "rdb");
 
-   if (     
+   if (
             !query_entry
          ||  (string_is_empty(query_entry->value))
          || !rdb_entry
@@ -325,11 +325,11 @@ static int deferred_push_cursor_manager_list_deferred(
    }
 
    settings = config_get_ptr();
-   
+
    fill_pathname_join_special(rdb_path,
          settings->paths.path_content_database,
          rdb_entry->value, sizeof(rdb_path));
-   
+
    if (!string_is_empty(info->path_b))
       free(info->path_b);
 
@@ -343,7 +343,7 @@ static int deferred_push_cursor_manager_list_deferred(
 
    info->path_c    = strdup(query_entry->value);
    info->path      = strdup(rdb_path);
-   
+
    config_file_free(conf);
 
    return deferred_push_dlist(info, DISPLAYLIST_DATABASE_QUERY, settings);
@@ -358,7 +358,7 @@ static int deferred_push_cursor_manager_list_generic(
    const char *path              = info->path;
    struct string_list str_list   = {0};
    settings_t *settings          = config_get_ptr();
-   
+
    if (!path)
       goto end;
 
@@ -410,11 +410,12 @@ GENERIC_DEFERRED_CURSOR_MANAGER(deferred_push_cursor_manager_list_deferred_query
 static int general_push(menu_displaylist_info_t *info,
       unsigned id, enum menu_displaylist_ctl_state state)
 {
-   char newstring2[PATH_MAX_LENGTH];
+   char newstr2[PATH_MAX_LENGTH];
+   size_t _len = 0;
    settings_t                  *settings      = config_get_ptr();
    menu_handle_t                  *menu       = menu_state_get_ptr()->driver_data;
 #if defined(HAVE_FFMPEG) || defined(HAVE_MPV) || defined (HAVE_AUDIOMIXER)
-   bool 
+   bool
       multimedia_builtin_mediaplayer_enable   = settings->bools.multimedia_builtin_mediaplayer_enable;
 #endif
 #ifdef HAVE_IMAGEVIEWER
@@ -423,7 +424,7 @@ static int general_push(menu_displaylist_info_t *info,
 
    if (!menu)
       return -1;
-   
+
    if (   (id == PUSH_ARCHIVE_OPEN_DETECT_CORE)
        || (id == PUSH_ARCHIVE_OPEN))
    {
@@ -457,18 +458,17 @@ static int general_push(menu_displaylist_info_t *info,
    info->type_default = FILE_TYPE_PLAIN;
    if (id != PUSH_DETECT_CORE_LIST)
       info->setting   = menu_setting_find_enum(info->enum_idx);
-   newstring2[0]      = '\0';
+   newstr2[0]          = '\0';
 
    switch (id)
    {
       case PUSH_ARCHIVE_OPEN:
          {
-            struct retro_system_info *sysinfo = 
+            struct retro_system_info *sysinfo =
                &runloop_state_get_ptr()->system.info;
-            if (sysinfo)
-               if (!string_is_empty(sysinfo->valid_extensions))
-                  strlcpy(newstring2, sysinfo->valid_extensions,
-                        sizeof(newstring2));
+            if (sysinfo && !string_is_empty(sysinfo->valid_extensions))
+               _len = strlcpy(newstr2 + _len, sysinfo->valid_extensions,
+                     sizeof(newstr2)  - _len);
          }
          break;
       case PUSH_DEFAULT:
@@ -487,61 +487,37 @@ static int general_push(menu_displaylist_info_t *info,
 
             if (!string_is_empty(valid_extensions))
             {
-               struct string_list str_list3 = {0};
-
-               string_list_initialize(&str_list3);
-               string_split_noalloc(&str_list3, valid_extensions, "|");
-
+               _len += strlcpy(newstr2 + _len, valid_extensions, sizeof(newstr2) - _len);
 #ifdef HAVE_IBXM
-               {
-                  union string_list_elem_attr attr;
-                  attr.i = 0;
-                  string_list_append(&str_list3, "s3m", attr);
-                  string_list_append(&str_list3, "mod", attr);
-                  string_list_append(&str_list3, "xm", attr);
-               }
+               if (_len > 0 && newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|",   sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "s3m", sizeof(newstr2) - _len);
+               if (_len > 0 && newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|",   sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "mod", sizeof(newstr2) - _len);
+               if (_len > 0 && newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|",   sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "xm",  sizeof(newstr2) - _len);
 #endif
-               string_list_join_concat(newstring2, sizeof(newstring2),
-                     &str_list3, "|");
-               string_list_deinitialize(&str_list3);
             }
          }
          break;
       case PUSH_ARCHIVE_OPEN_DETECT_CORE:
       case PUSH_DETECT_CORE_LIST:
          {
-            union string_list_elem_attr attr;
-            char newstring[PATH_MAX_LENGTH];
+            char newstr1[PATH_MAX_LENGTH];
             struct string_list str_list2      = {0};
-            struct retro_system_info *sysinfo = 
+            struct retro_system_info *sysinfo =
                &runloop_state_get_ptr()->system.info;
             bool filter_by_current_core       = settings->bools.filter_by_current_core;
 
-            newstring[0]                      = '\0';
-            attr.i                            = 0;
+            newstr1[0]                        = '\0';
 
             string_list_initialize(&str_list2);
 
-            if (sysinfo)
-            {
-               if (!string_is_empty(sysinfo->valid_extensions))
-               {
-                  unsigned x;
-                  struct string_list  str_list    = {0};
-
-                  string_list_initialize(&str_list);
-                  string_split_noalloc(&str_list,
+            if (sysinfo && !string_is_empty(sysinfo->valid_extensions))
+                  string_split_noalloc(&str_list2,
                         sysinfo->valid_extensions, "|");
-
-                  for (x = 0; x < str_list.size; x++)
-                  {
-                     const char *elem = str_list.elems[x].data;
-                     string_list_append(&str_list2, elem, attr);
-                  }
-
-                  string_list_deinitialize(&str_list);
-               }
-            }
 
             if (!filter_by_current_core)
             {
@@ -550,14 +526,21 @@ static int general_push(menu_displaylist_info_t *info,
                if (list && !string_is_empty(list->all_ext))
                {
                   unsigned x;
+                  union string_list_elem_attr attr;
                   struct string_list str_list  = {0};
                   string_list_initialize(&str_list);
+                  attr.i                        = 0;
 
-                  string_split_noalloc(&str_list, 
+                  string_split_noalloc(&str_list,
                         list->all_ext, "|");
 
                   for (x = 0; x < str_list.size; x++)
                   {
+                     /* Is extension not already added to
+                      * str_list2? This is the case if
+                      * the current core already supports
+                      * this extension. If so, it was added
+                      * in the loop above this one */
                      if (!string_list_find_elem(&str_list2,
                               str_list.elems[x].data))
                      {
@@ -570,44 +553,45 @@ static int general_push(menu_displaylist_info_t *info,
                }
             }
 
-            string_list_join_concat(newstring, sizeof(newstring),
+            string_list_join_concat(newstr1, sizeof(newstr1),
                   &str_list2, "|");
+            string_list_deinitialize(&str_list2);
 
-            {
-               struct string_list  str_list3  = {0};
-               string_list_initialize(&str_list3);
-               string_split_noalloc(&str_list3, newstring, "|");
-
+            _len += strlcpy(newstr2 + _len, newstr1, sizeof(newstr2) - _len);
 #if defined(HAVE_AUDIOMIXER)
-               if (multimedia_builtin_mediaplayer_enable)
-               {
-                  union string_list_elem_attr attr;
-                  attr.i = 0;
+            if (multimedia_builtin_mediaplayer_enable)
+            {
 #if defined(HAVE_DR_MP3)
-                  string_list_append(&str_list3, "mp3", attr);
+               if (newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "mp3", sizeof(newstr2) - _len);
 #endif
 #if defined(HAVE_STB_VORBIS)
-                  string_list_append(&str_list3, "ogg", attr);
+               if (newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "ogg", sizeof(newstr2) - _len);
 #endif
 #if defined(HAVE_DR_FLAC)
-                  string_list_append(&str_list3, "flac", attr);
+               if (newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "flac", sizeof(newstr2) - _len);
 #endif
 #if defined(HAVE_RWAV)
-                  string_list_append(&str_list3, "wav", attr);
+               if (newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "wav", sizeof(newstr2) - _len);
 #endif
 #ifdef HAVE_IBXM
-
-                  string_list_append(&str_list3, "s3m", attr);
-                  string_list_append(&str_list3, "mod", attr);
-                  string_list_append(&str_list3, "xm", attr);
+               if (newstr2[_len-1] != '\0')
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "s3m", sizeof(newstr2) - _len);
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "mod", sizeof(newstr2) - _len);
+                  _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+               _len    += strlcpy(newstr2 + _len, "xm", sizeof(newstr2) - _len);
 #endif
-               }
-#endif
-               string_list_join_concat(newstring2, sizeof(newstring2),
-                     &str_list3, "|");
-               string_list_deinitialize(&str_list3);
             }
-            string_list_deinitialize(&str_list2);
+#endif
          }
          break;
    }
@@ -621,8 +605,8 @@ static int general_push(menu_displaylist_info_t *info,
 #elif defined(HAVE_MPV)
       libretro_mpv_retro_get_system_info(&sysinfo);
 #endif
-      strlcat(newstring2, "|", sizeof(newstring2));
-      strlcat(newstring2, sysinfo.valid_extensions, sizeof(newstring2));
+      _len += strlcpy(newstr2 + _len, "|", sizeof(newstr2) - _len);
+      _len += strlcpy(newstr2 + _len, sysinfo.valid_extensions, sizeof(newstr2) - _len);
    }
 #endif
 
@@ -631,17 +615,18 @@ static int general_push(menu_displaylist_info_t *info,
    {
       struct retro_system_info sysinfo = {0};
       libretro_imageviewer_retro_get_system_info(&sysinfo);
-      strlcat(newstring2, "|", sizeof(newstring2));
-      strlcat(newstring2, sysinfo.valid_extensions,
-            sizeof(newstring2));
+      _len += strlcpy(newstr2 + _len, "|",
+            sizeof(newstr2)   - _len);
+      _len += strlcpy(newstr2 + _len, sysinfo.valid_extensions,
+            sizeof(newstr2)   - _len);
    }
 #endif
 
-   if (!string_is_empty(newstring2))
+   if (!string_is_empty(newstr2))
    {
       if (info->exts)
          free(info->exts);
-      info->exts = strdup(newstring2);
+      info->exts = strdup(newstr2);
    }
 
    return deferred_push_dlist(info, state, settings);
@@ -680,6 +665,7 @@ GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_disk_index, PUSH_D
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_device_type, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DEVICE_TYPE)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_description, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_description_kbd, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION_KBD)
+GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_select_reserved_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_SELECT_RESERVED_DEVICE)
 #ifdef ANDROID
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_select_physical_keyboard, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD)
 #endif
@@ -693,7 +679,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       const char *label)
 {
    unsigned i;
-   typedef struct deferred_info_list 
+   typedef struct deferred_info_list
    {
       enum msg_hash_enums type;
       int (*cb)(menu_displaylist_info_t *info);
@@ -726,6 +712,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DEVICE_TYPE, deferred_push_dropdown_box_list_input_device_type},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION, deferred_push_dropdown_box_list_input_description},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION_KBD, deferred_push_dropdown_box_list_input_description_kbd},
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_RESERVED_DEVICE, deferred_push_dropdown_box_list_input_select_reserved_device},
 #ifdef ANDROID
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD, deferred_push_dropdown_box_list_input_select_physical_keyboard},
 #endif
@@ -1015,7 +1002,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
             break;
          case MENU_ENUM_LABEL_DEFERRED_ACCOUNTS_FACEBOOK_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_accounts_facebook_list);
-            break;            
+            break;
          case MENU_ENUM_LABEL_DEFERRED_ARCHIVE_ACTION_DETECT_CORE:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_archive_action_detect_core);
             break;

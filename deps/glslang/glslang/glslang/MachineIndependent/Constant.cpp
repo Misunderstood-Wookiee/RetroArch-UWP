@@ -191,9 +191,9 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, const TIntermTyped* right
                 break;
 
             case EbtUint8:
-                if (rightUnionArray[i] == 0)
+                if (rightUnionArray[i] == 0) {
                     newConstArray[i].setU8Const(0xFF);
-                else
+                } else
                     newConstArray[i].setU8Const(leftUnionArray[i].getU8Const() / rightUnionArray[i].getU8Const());
                 break;
 
@@ -207,9 +207,9 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, const TIntermTyped* right
                 break;
 
             case EbtUint16:
-                if (rightUnionArray[i] == 0)
+                if (rightUnionArray[i] == 0) {
                     newConstArray[i].setU16Const(0xFFFF);
-                else
+                } else
                     newConstArray[i].setU16Const(leftUnionArray[i].getU16Const() / rightUnionArray[i].getU16Const());
                 break;
 
@@ -342,7 +342,7 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, const TIntermTyped* right
         for (int i = 0; i < newComps; i++) {
             switch (getType().getBasicType()) {
             case EbtBool: newConstArray[i].setBConst((leftUnionArray[i] == rightUnionArray[i]) ? false : true); break;
-            default: break;
+            default: assert(false && "Default missing");
             }
         }
         break;
@@ -505,6 +505,7 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, const TType& returnType) 
         return 0;
 
     default:
+        assert(componentWise);
         break;
     }
 
@@ -701,7 +702,7 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, const TType& returnType) 
 //
 TIntermTyped* TIntermediate::fold(TIntermAggregate* aggrNode)
 {
-    if (aggrNode == NULL)
+    if (aggrNode == nullptr)
         return aggrNode;
 
     if (! areAllChildConst(aggrNode))
@@ -816,7 +817,7 @@ TIntermTyped* TIntermediate::fold(TIntermAggregate* aggrNode)
                 case EbtUint64:
                     newConstArray[comp].setU64Const(std::min(childConstUnions[0][arg0comp].getU64Const(), childConstUnions[1][arg1comp].getU64Const()));
                     break;
-                default: break;
+                default: assert(false && "Default missing");
                 }
                 break;
             case EOpMax:
@@ -850,7 +851,7 @@ TIntermTyped* TIntermediate::fold(TIntermAggregate* aggrNode)
                 case EbtUint64:
                     newConstArray[comp].setU64Const(std::max(childConstUnions[0][arg0comp].getU64Const(), childConstUnions[1][arg1comp].getU64Const()));
                     break;
-                default: break;
+                default: assert(false && "Default missing");
                 }
                 break;
             case EOpClamp:
@@ -893,7 +894,7 @@ TIntermTyped* TIntermediate::fold(TIntermAggregate* aggrNode)
                     newConstArray[comp].setU64Const(std::min(std::max(childConstUnions[0][arg0comp].getU64Const(), childConstUnions[1][arg1comp].getU64Const()),
                                                                                                                        childConstUnions[2][arg2comp].getU64Const()));
                     break;
-                default: break;
+                default: assert(false && "Default missing");
                 }
                 break;
             case EOpLessThan:
@@ -1076,6 +1077,7 @@ TIntermTyped* TIntermediate::foldDereference(TIntermTyped* node, int index, cons
         start = size * index;
     else {
         // it is a structure
+        assert(node->isStruct());
         start = 0;
         for (int i = 0; i < index; ++i)
             start += (*node->getType().getStruct())[i].type->computeNumComponents();
