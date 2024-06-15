@@ -173,8 +173,9 @@ void TType::buildMangledName(TString& mangledName) const
 void TVariable::dump(TInfoSink& infoSink) const
 {
     infoSink.debug << getName().c_str() << ": " << type.getStorageQualifierString() << " " << type.getBasicTypeString();
-    if (type.isArray())
+    if (type.isArray()) {
         infoSink.debug << "[0]";
+    }
     infoSink.debug << "\n";
 }
 
@@ -288,23 +289,26 @@ TVariable::TVariable(const TVariable& copyOf) : TSymbol(copyOf)
         setExtensions(copyOf.numExtensions, copyOf.extensions);
 
     if (! copyOf.constArray.empty()) {
+        assert(! copyOf.type.isStruct());
         TConstUnionArray newArray(copyOf.constArray, 0, copyOf.constArray.size());
         constArray = newArray;
     }
 
     // don't support specialization-constant subtrees in cloned tables
-    constSubtree = NULL;
+    constSubtree = nullptr;
 }
 
 TVariable* TVariable::clone() const
 {
-    return new TVariable(*this);
+    TVariable *variable = new TVariable(*this);
+
+    return variable;
 }
 
 TFunction::TFunction(const TFunction& copyOf) : TSymbol(copyOf)
 {
     for (unsigned int i = 0; i < copyOf.parameters.size(); ++i) {
-        TParameter param = {};
+        TParameter param;
         parameters.push_back(param);
         parameters.back().copyParam(copyOf.parameters[i]);
     }
@@ -330,10 +334,15 @@ TFunction* TFunction::clone() const
     return function;
 }
 
-// Anonymous members of a given block should be cloned at a higher level,
-// where they can all be assured to still end up pointing to a single
-// copy of the original container.
-TAnonMember* TAnonMember::clone() const { return 0; }
+TAnonMember* TAnonMember::clone() const
+{
+    // Anonymous members of a given block should be cloned at a higher level,
+    // where they can all be assured to still end up pointing to a single
+    // copy of the original container.
+    assert(0);
+
+    return 0;
+}
 
 TSymbolTableLevel* TSymbolTableLevel::clone() const
 {
@@ -364,6 +373,8 @@ TSymbolTableLevel* TSymbolTableLevel::clone() const
 
 void TSymbolTable::copyTable(const TSymbolTable& copyOf)
 {
+    assert(adoptedLevels == copyOf.adoptedLevels);
+
     uniqueId = copyOf.uniqueId;
     noBuiltInRedeclarations = copyOf.noBuiltInRedeclarations;
     separateNameSpaces = copyOf.separateNameSpaces;

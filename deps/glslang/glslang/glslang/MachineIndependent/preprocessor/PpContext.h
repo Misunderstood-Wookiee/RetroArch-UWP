@@ -273,7 +273,7 @@ public:
     MacroSymbol* lookupMacroDef(int atom)
     {
         auto existingMacroIt = macroDefs.find(atom);
-        return (existingMacroIt == macroDefs.end()) ? NULL : &(existingMacroIt->second);
+        return (existingMacroIt == macroDefs.end()) ? nullptr : &(existingMacroIt->second);
     }
     void addMacroDef(int atom, MacroSymbol& macroDef) { macroDefs[atom] = macroDef; }
 
@@ -333,8 +333,8 @@ protected:
         }
 
         virtual int scan(TPpToken*) override;
-        virtual int getch() override { return EndOfInput; }
-        virtual void ungetch() override { }
+        virtual int getch() override { assert(0); return EndOfInput; }
+        virtual void ungetch() override { assert(0); }
         bool peekPasting() override { return prepaste; }
         bool endOfReplacementList() override { return mac->body.atEnd(); }
         bool isMacroInput() override { return true; }
@@ -359,8 +359,8 @@ protected:
 
             return marker;
         }
-        virtual int getch() override { return EndOfInput; }
-        virtual void ungetch() override { }
+        virtual int getch() override { assert(0); return EndOfInput; }
+        virtual void ungetch() override { assert(0); }
         static const int marker = -3;
     };
 
@@ -368,8 +368,8 @@ protected:
     public:
         tZeroInput(TPpContext* pp) : tInput(pp) { }
         virtual int scan(TPpToken*) override;
-        virtual int getch() override { return EndOfInput; }
-        virtual void ungetch() override { }
+        virtual int getch() override { assert(0); return EndOfInput; }
+        virtual void ungetch() override { assert(0); }
     };
 
     std::vector<tInput*> inputStack;
@@ -406,13 +406,14 @@ protected:
     // From PpTokens.cpp
     //
     void pushTokenStreamInput(TokenStream&, bool pasting = false);
+    void UngetToken(int token, TPpToken*);
 
     class tTokenInput : public tInput {
     public:
         tTokenInput(TPpContext* pp, TokenStream* t, bool prepasting) : tInput(pp), tokens(t), lastTokenPastes(prepasting) { }
         virtual int scan(TPpToken *ppToken) override { return tokens->getToken(pp->_parseContext, ppToken); }
-        virtual int getch() override { return EndOfInput; }
-        virtual void ungetch() override { }
+        virtual int getch() override { assert(0); return EndOfInput; }
+        virtual void ungetch() override { assert(0); }
         virtual bool peekPasting() override { return tokens->peekTokenizedPasting(lastTokenPastes); }
     protected:
         TokenStream* tokens;
@@ -423,8 +424,8 @@ protected:
     public:
         tUngotTokenInput(TPpContext* pp, int t, TPpToken* p) : tInput(pp), token(t), lval(*p) { }
         virtual int scan(TPpToken *) override;
-        virtual int getch() override { return EndOfInput; }
-        virtual void ungetch() override { }
+        virtual int getch() override { assert(0); return EndOfInput; }
+        virtual void ungetch() override { assert(0); }
     protected:
         int token;
         TPpToken lval;
@@ -526,7 +527,7 @@ protected:
               epilogue_(epilogue),
               includedFile_(includedFile),
               scanner(3, strings, lengths, names, 0, 0, true),
-              prevScanner(NULL),
+              prevScanner(nullptr),
               stringInput(pp, scanner)
         {
               strings[0] = prologue_.data();

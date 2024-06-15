@@ -38,6 +38,7 @@
 // SpvBuilder.h.
 //
 
+#include <cassert>
 #include <cstdlib>
 
 #include <unordered_set>
@@ -308,6 +309,8 @@ Id Builder::makeVectorType(Id component, int size)
 
 Id Builder::makeMatrixType(Id component, int cols, int rows)
 {
+    assert(cols <= maxMatrixSize && rows <= maxMatrixSize);
+
     Id column = makeVectorType(component, rows);
 
     // try to find it
@@ -401,6 +404,8 @@ Id Builder::makeFunctionType(Id returnType, const std::vector<Id>& paramTypes)
 
 Id Builder::makeImageType(Id sampledType, Dim dim, bool depth, bool arrayed, bool ms, unsigned sampled, ImageFormat format)
 {
+    assert(sampled == 1 || sampled == 2);
+
     // try to find it
     Instruction* type;
     for (int t = 0; t < (int)groupedTypes[OpTypeImage].size(); ++t) {
@@ -502,6 +507,8 @@ Id Builder::makeSampledImageType(Id imageType)
 Id Builder::getDerefTypeId(Id resultId) const
 {
     Id typeId = getTypeId(resultId);
+    assert(isPointerType(typeId));
+
     return module.getInstruction(typeId)->getImmediateOperand(1);
 }
 
@@ -526,9 +533,9 @@ Op Builder::getMostBasicTypeClass(Id typeId) const
     case OpTypePointer:
         return getMostBasicTypeClass(instr->getIdOperand(1));
     default:
-	break;
+        assert(0);
+        return OpTypeFloat;
     }
-    return OpTypeFloat;
 }
 
 int Builder::getNumTypeConstituents(Id typeId) const
@@ -537,6 +544,10 @@ int Builder::getNumTypeConstituents(Id typeId) const
 
     switch (instr->getOpCode())
     {
+    case OpTypeBool:
+    case OpTypeInt:
+    case OpTypeFloat:
+        return 1;
     case OpTypeVector:
     case OpTypeMatrix:
         return instr->getImmediateOperand(1);
@@ -547,13 +558,10 @@ int Builder::getNumTypeConstituents(Id typeId) const
     }
     case OpTypeStruct:
         return instr->getNumOperands();
-    case OpTypeBool:
-    case OpTypeInt:
-    case OpTypeFloat:
     default:
-	break;
+        assert(0);
+        return 1;
     }
-    return 1;
 }
 
 // Return the lowest-level type of scalar that an homogeneous composite is made out of.
@@ -579,9 +587,9 @@ Id Builder::getScalarTypeId(Id typeId) const
     case OpTypePointer:
         return getScalarTypeId(getContainedTypeId(typeId));
     default:
-	break;
+        assert(0);
+        return NoResult;
     }
-    return NoResult;
 }
 
 // Return the type of 'member' of a composite.
@@ -602,9 +610,9 @@ Id Builder::getContainedTypeId(Id typeId, int member) const
     case OpTypeStruct:
         return instr->getIdOperand(member);
     default:
-	break;
+        assert(0);
+        return NoResult;
     }
-    return NoResult;
 }
 
 // Return the immediately contained type of a given composite type.
@@ -842,6 +850,8 @@ Id Builder::makeFloat16Constant(float f16, bool specConstant)
 
 Id Builder::makeFpConstant(Id type, double d, bool specConstant)
 {
+        assert(isFloatType(type));
+
         switch (getScalarTypeWidth(type)) {
         case 16:
                 return makeFloat16Constant((float)d, specConstant);
@@ -853,6 +863,7 @@ Id Builder::makeFpConstant(Id type, double d, bool specConstant)
                 break;
         }
 
+        assert(false);
         return NoResult;
 }
 
@@ -912,6 +923,7 @@ Id Builder::findStructConstant(Id typeId, const std::vector<Id>& comps)
 Id Builder::makeCompositeConstant(Id typeId, const std::vector<Id>& members, bool specConstant)
 {
     Op opcode = specConstant ? OpSpecConstantComposite : OpConstantComposite;
+    assert(typeId);
     Op typeClass = getTypeClass(typeId);
 
     switch (typeClass) {
@@ -932,6 +944,7 @@ Id Builder::makeCompositeConstant(Id typeId, const std::vector<Id>& members, boo
         }
         break;
     default:
+        assert(0);
         return makeFloatConstant(0.0);
     }
 
@@ -1067,6 +1080,8 @@ void Builder::addMemberDecoration(Id id, unsigned int member, Decoration decorat
 // Comments in header
 Function* Builder::makeEntryPoint(const char* entryPoint)
 {
+    assert(! entryPointFunction);
+
     Block* entry;
     std::vector<Id> params;
     std::vector<std::vector<Decoration>> decorations;
@@ -1126,6 +1141,7 @@ void Builder::leaveFunction()
 {
     Block* block = buildPoint;
     Function& function = buildPoint->getParent();
+    assert(block);
 
     // If our function did not contain a return, add a return void now.
     if (! block->isTerminated()) {
@@ -1201,11 +1217,13 @@ Id Builder::createAccessChain(StorageClass storageClass, Id base, const std::vec
 {
     // Figure out the final resulting type.
     spv::Id typeId = getTypeId(base);
+    assert(isPointerType(typeId) && offsets.size() > 0);
     typeId = getContainedTypeId(typeId);
     for (int i = 0; i < (int)offsets.size(); ++i) {
-        if (isStructType(typeId))
+        if (isStructType(typeId)) {
+            assert(isConstantScalar(offsets[i]));
             typeId = getContainedTypeId(typeId, getConstantScalar(offsets[i]));
-        else
+        } else
             typeId = getContainedTypeId(typeId, offsets[i]);
     }
     typeId = makePointer(storageClass, typeId);
@@ -1447,6 +1465,7 @@ Id Builder::createRvalueSwizzle(Decoration precision, Id typeId, Id source, cons
         return setPrecision(createSpecConstantOp(OpVectorShuffle, typeId, operands, channels), precision);
     }
     Instruction* swizzle = new Instruction(getUniqueId(), typeId, OpVectorShuffle);
+    assert(isVector(source));
     swizzle->addIdOperand(source);
     swizzle->addIdOperand(source);
     for (int i = 0; i < (int)channels.size(); ++i)
@@ -1464,8 +1483,11 @@ Id Builder::createLvalueSwizzle(Id typeId, Id target, Id source, const std::vect
 
     Instruction* swizzle = new Instruction(getUniqueId(), typeId, OpVectorShuffle);
 
+    assert(isVector(target));
     swizzle->addIdOperand(target);
 
+    assert(getNumComponents(source) == (int)channels.size());
+    assert(isVector(source));
     swizzle->addIdOperand(source);
 
     // Set up an identity shuffle from the base value to the result value
@@ -1502,11 +1524,14 @@ void Builder::promoteScalar(Decoration precision, Id& left, Id& right)
 // Comments in header
 Id Builder::smearScalar(Decoration precision, Id scalar, Id vectorType)
 {
+    assert(getNumComponents(scalar) == 1);
+    assert(getTypeId(scalar) == getScalarTypeId(vectorType));
+
     int numComponents = getNumTypeComponents(vectorType);
     if (numComponents == 1)
         return scalar;
 
-    Instruction* smear = NULL;
+    Instruction* smear = nullptr;
     if (generatingOpCodeForSpecConst) {
         auto members = std::vector<spv::Id>(numComponents, scalar);
         // Sometime even in spec-constant-op mode, the temporary vector created by
@@ -1775,6 +1800,7 @@ Id Builder::createTextureQueryCall(Op opCode, const TextureParameters& parameter
             break;
 
         default:
+            assert(0);
             break;
         }
         if (isArrayedImageType(getImageType(parameters.sampler)))
@@ -1800,6 +1826,7 @@ Id Builder::createTextureQueryCall(Op opCode, const TextureParameters& parameter
         resultType = isUnsignedResult ? makeUintType(32) : makeIntType(32);
         break;
     default:
+        assert(0);
         break;
     }
 
@@ -1828,6 +1855,7 @@ Id Builder::createCompositeCompare(Decoration precision, Id value1, Id value2, b
     // Scalars and Vectors
 
     if (isScalarType(valueType) || isVectorType(valueType)) {
+        assert(valueType == getTypeId(value2));
         // These just need a single comparison, just have
         // to figure out what it is.
         Op op;
@@ -1859,6 +1887,10 @@ Id Builder::createCompositeCompare(Decoration precision, Id value1, Id value2, b
         return setPrecision(resultId, precision);
     }
 
+    // Only structs, arrays, and matrices should be left.
+    // They share in common the reduction operation across their constituents.
+    assert(isAggregateType(valueType) || isMatrixType(valueType));
+
     // Compare each pair of constituents
     for (int constituent = 0; constituent < numConstituents; ++constituent) {
         std::vector<unsigned> indexes(1, constituent);
@@ -1881,6 +1913,8 @@ Id Builder::createCompositeCompare(Decoration precision, Id value1, Id value2, b
 // OpCompositeConstruct
 Id Builder::createCompositeConstruct(Id typeId, const std::vector<Id>& constituents)
 {
+    assert(isAggregateType(typeId) || (getNumTypeConstituents(typeId) > 1 && getNumTypeConstituents(typeId) == (int)constituents.size()));
+
     if (generatingOpCodeForSpecConst) {
         // Sometime, even in spec-constant-op mode, the constant composite to be
         // constructed may not be a specialization constant.
@@ -1973,6 +2007,8 @@ Id Builder::createConstructor(Decoration precision, const std::vector<Id>& sourc
             accumulateVectorConstituents(sources[i]);
         else if (isMatrix(sources[i]))
             accumulateMatrixConstituents(sources[i]);
+        else
+            assert(0);
 
         if (targetComponent >= numTargetComponents)
             break;
@@ -2264,6 +2300,7 @@ void Builder::accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizz
         std::vector<unsigned> oldSwizzle = accessChain.swizzle;
         accessChain.swizzle.resize(0);
         for (unsigned int i = 0; i < swizzle.size(); ++i) {
+            assert(swizzle[i] < oldSwizzle.size());
             accessChain.swizzle.push_back(oldSwizzle[swizzle[i]]);
         }
     } else
@@ -2276,9 +2313,14 @@ void Builder::accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizz
 // Comments in header
 void Builder::accessChainStore(Id rvalue)
 {
+    assert(accessChain.isRValue == false);
+
     transferAccessChainSwizzle(true);
     Id base = collapseAccessChain();
     Id source = rvalue;
+
+    // dynamic component should be gone
+    assert(accessChain.component == NoResult);
 
     // If swizzle still exists, it is out-of-order or not full, we must load the target vector,
     // extract and insert elements to perform writeMask and/or swizzle.
@@ -2364,8 +2406,18 @@ Id Builder::accessChainLoad(Decoration precision, Decoration nonUniform, Id resu
 
 Id Builder::accessChainGetLValue()
 {
+    assert(accessChain.isRValue == false);
+
     transferAccessChainSwizzle(true);
-    return collapseAccessChain();
+    Id lvalue = collapseAccessChain();
+
+    // If swizzle exists, it is out-of-order or not full, we must load the target vector,
+    // extract and insert elements to perform writeMask and/or swizzle.  This does not
+    // go with getting a direct l-value pointer.
+    assert(accessChain.swizzle.size() == 0);
+    assert(accessChain.component == NoResult);
+
+    return lvalue;
 }
 
 // comment in header
@@ -2501,6 +2553,8 @@ void Builder::dump(std::vector<unsigned int>& out) const
 // Can generate code.
 Id Builder::collapseAccessChain()
 {
+    assert(accessChain.isRValue == false);
+
     // did we already emit an access chain for this?
     if (accessChain.instr != NoResult)
         return accessChain.instr;
@@ -2594,11 +2648,13 @@ void Builder::transferAccessChainSwizzle(bool dynamic)
 
     // single component, either in the swizzle and/or dynamic component
     if (accessChain.swizzle.size() == 1) {
+        assert(accessChain.component == NoResult);
         // handle static component selection
         accessChain.indexChain.push_back(makeUintConstant(accessChain.swizzle.front()));
         accessChain.swizzle.clear();
         accessChain.preSwizzleBaseType = NoType;
     } else if (dynamic && accessChain.component != NoResult) {
+        assert(accessChain.swizzle.size() == 0);
         // handle dynamic component
         accessChain.indexChain.push_back(accessChain.component);
         accessChain.preSwizzleBaseType = NoType;

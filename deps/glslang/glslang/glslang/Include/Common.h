@@ -102,6 +102,7 @@ std::string to_string(const T& val) {
 #include <algorithm>
 #include <string>
 #include <cstdio>
+#include <cassert>
 
 #include "PoolAlloc.h"
 
@@ -200,6 +201,12 @@ class TUnorderedMap : public std::unordered_map<K, D, HASH, PRED, pool_allocator
 typedef std::basic_string<char> TPersistString;
 
 //
+// templatized min and max functions.
+//
+template <class T> T Min(const T a, const T b) { return a < b ? a : b; }
+template <class T> T Max(const T a, const T b) { return a > b ? a : b; }
+
+//
 // Create a TString object from an integer.
 //
 #if defined _MSC_VER || defined MINGW_HAS_SECURE_API
@@ -222,12 +229,12 @@ inline const TString String(const int i, const int /*base*/ = 10)
 #endif
 
 struct TSourceLoc {
-    void init() { name = NULL; string = 0; line = 0; column = 0; }
+    void init() { name = nullptr; string = 0; line = 0; column = 0; }
     void init(int stringNum) { init(); string = stringNum; }
     // Returns the name if it exists. Otherwise, returns the string number.
     std::string getStringNameOrNum(bool quoteStringName = true) const
     {
-        if (name != NULL)
+        if (name != nullptr)
             return quoteStringName ? ("\"" + std::string(name) + "\"") : name;
         return std::to_string((long long)string);
     }
@@ -256,11 +263,13 @@ template <class T> bool IsPow2(T powerOf2)
 // a power, just a number that must be a power of 2.
 template <class T> void RoundToPow2(T& number, int powerOf2)
 {
+    assert(IsPow2(powerOf2));
     number = (number + powerOf2 - 1) & ~(powerOf2 - 1);
 }
 
 template <class T> bool IsMultipleOfPow2(T number, int powerOf2)
 {
+    assert(IsPow2(powerOf2));
     return ! (number & (powerOf2 - 1));
 }
 
