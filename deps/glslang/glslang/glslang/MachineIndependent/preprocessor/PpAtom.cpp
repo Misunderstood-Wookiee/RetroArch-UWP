@@ -80,6 +80,7 @@ NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 
@@ -164,8 +165,7 @@ TStringAtomMap::TStringAtomMap()
     char t[2];
 
     t[1] = '\0';
-    while (*s)
-    {
+    while (*s) {
         t[0] = *s;
         addAtomFixed(t, s[0]);
         s++;

@@ -8154,7 +8154,6 @@ static void setting_get_string_representation_input_device_reserved_device_name(
         rarch_setting_t *setting,
         char *s, size_t len)
 {
-    settings_t *settings = config_get_ptr();
     int dev_vendor_id;
     int dev_product_id;
 
@@ -9669,7 +9668,7 @@ static bool setting_append_list_input_player_options(
 
       MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_IDX_PTR(list, list_info,
             (enum msg_hash_enums)(MENU_ENUM_LABEL_INPUT_DEVICE_RESERVED_DEVICE_NAME + user));
-      MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_VALUE_IDX(list, list_info, 
+      MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_VALUE_IDX(list, list_info,
             (enum msg_hash_enums)(MENU_ENUM_LABEL_VALUE_INPUT_DEVICE_RESERVED_DEVICE_NAME));
 
       CONFIG_UINT_ALT(
@@ -14703,7 +14702,7 @@ static bool setting_append_list(
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
 
 #ifdef HAVE_WASAPI
-         if (string_is_equal(settings->arrays.audio_driver, "wasapi"))
+         if (string_is_equal(audio_driver_get_ident(), "wasapi"))
          {
             CONFIG_BOOL(
                   list, list_info,

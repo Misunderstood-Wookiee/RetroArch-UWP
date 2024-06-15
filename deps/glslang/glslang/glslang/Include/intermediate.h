@@ -1158,7 +1158,10 @@ public:
     // it is essential to use "symbol = sym" to assign to symbol
     TIntermSymbol(int i, const TString& n, const TType& t)
         : TIntermTyped(t), id(i),
-        constSubtree(NULL)
+#ifdef ENABLE_HLSL
+        flattenSubset(-1),
+#endif
+        constSubtree(nullptr)
           { name = n; }
     virtual int getId() const { return id; }
     virtual const TString& getName() const { return name; }
@@ -1169,6 +1172,10 @@ public:
     const TConstUnionArray& getConstArray() const { return constArray; }
     void setConstSubtree(TIntermTyped* subtree) { constSubtree = subtree; }
     TIntermTyped* getConstSubtree() const { return constSubtree; }
+#ifdef ENABLE_HLSL
+    void setFlattenSubset(int subset) { flattenSubset = subset; }
+    int getFlattenSubset() const { return flattenSubset; } // -1 means full object
+#endif
 
     // This is meant for cases where a node has already been constructed, and
     // later on, it becomes necessary to switch to a different symbol.
@@ -1176,6 +1183,9 @@ public:
 
 protected:
     int id;                      // the unique id of the symbol this node represents
+#ifdef ENABLE_HLSL
+    int flattenSubset;           // how deeply the flattened object rooted at id has been dereferenced
+#endif
     TString name;                // the name of the symbol this node represents
     TConstUnionArray constArray; // if the symbol is a front-end compile-time constant, this is its value
     TIntermTyped* constSubtree;
@@ -1471,8 +1481,8 @@ typedef TVector<TStorageQualifier> TQualifierList;
 //
 class TIntermAggregate : public TIntermOperator {
 public:
-    TIntermAggregate() : TIntermOperator(EOpNull), userDefined(false), pragmaTable(NULL) { }
-    TIntermAggregate(TOperator o) : TIntermOperator(o), pragmaTable(NULL) { }
+    TIntermAggregate() : TIntermOperator(EOpNull), userDefined(false), pragmaTable(nullptr) { }
+    TIntermAggregate(TOperator o) : TIntermOperator(o), pragmaTable(nullptr) { }
     ~TIntermAggregate() { delete pragmaTable; }
     virtual       TIntermAggregate* getAsAggregate()       { return this; }
     virtual const TIntermAggregate* getAsAggregate() const { return this; }

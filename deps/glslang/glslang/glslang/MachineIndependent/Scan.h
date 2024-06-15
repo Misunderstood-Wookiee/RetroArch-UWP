@@ -51,7 +51,7 @@ const int EndOfInput = -1;
 //
 class TInputScanner {
 public:
-    TInputScanner(int n, const char* const s[], size_t L[], const char* const* names = NULL,
+    TInputScanner(int n, const char* const s[], size_t L[], const char* const* names = nullptr,
                   int b = 0, int f = 0, bool single = false) :
         numSources(n),
          // up to this point, common usage is "char*", but now we need positive 8-bit characters
@@ -63,7 +63,7 @@ public:
         for (int i = 0; i < numSources; ++i) {
             loc[i].init(i - stringBias);
         }
-        if (names != NULL) {
+        if (names != nullptr) {
             for (int i = 0; i < numSources; ++i)
                 loc[i].name = names[i];
         }
@@ -107,12 +107,12 @@ public:
         // N.B. Sources can have a length of 0.
         int sourceToRead = currentSource;
         size_t charToRead = currentChar;
-        while(charToRead >= lengths[sourceToRead])
-        {
+        while(charToRead >= lengths[sourceToRead]) {
             charToRead = 0;
             sourceToRead += 1;
-            if (sourceToRead >= numSources)
+            if (sourceToRead >= numSources) {
                 return EndOfInput;
+            }
         }
 
         // Here, we care about making negative valued characters positive
@@ -130,16 +130,15 @@ public:
             --currentChar;
             --loc[currentSource].column;
             --logicalSourceLoc.column;
-            if (loc[currentSource].column < 0)
-            {
+            if (loc[currentSource].column < 0) {
                 // We've moved back past a new line. Find the
                 // previous newline (or start of the file) to compute
                 // the column count on the now current line.
                 size_t chIndex = currentChar;
-                while (chIndex > 0)
-                {
-                    if (sources[currentSource][chIndex] == '\n')
+                while (chIndex > 0) {
+                    if (sources[currentSource][chIndex] == '\n') {
                         break;
+                    }
                     --chIndex;
                 }
                 logicalSourceLoc.column = (int)(currentChar - chIndex);
@@ -149,10 +148,10 @@ public:
             do {
                 --currentSource;
             } while (currentSource > 0 && lengths[currentSource] == 0);
-            if (lengths[currentSource] == 0)
+            if (lengths[currentSource] == 0) {
                 // set to 0 if we've backed up to the start of an empty string
                 currentChar = 0;
-            else
+            } else
                 currentChar = lengths[currentSource] - 1;
         }
         if (peek() == '\n') {
@@ -187,8 +186,8 @@ public:
     {
         logicalSourceLoc.string = newString;
         loc[getLastValidSourceIndex()].string = newString;
-        logicalSourceLoc.name = NULL;
-        loc[getLastValidSourceIndex()].name = NULL;
+        logicalSourceLoc.name = nullptr;
+        loc[getLastValidSourceIndex()].name = nullptr;
     }
 
     // for #include content indentation
@@ -208,9 +207,11 @@ public:
 
     const TSourceLoc& getSourceLoc() const
     {
-        if (singleLogical)
+        if (singleLogical) {
             return logicalSourceLoc;
-        return loc[std::max(0, std::min(currentSource, numSources - finale - 1))];
+        } else {
+            return loc[std::max(0, std::min(currentSource, numSources - finale - 1))];
+        }
     }
     // Returns the index (starting from 0) of the most recent valid source string we are reading from.
     int getLastValidSourceIndex() const { return std::min(currentSource, numSources - 1); }
