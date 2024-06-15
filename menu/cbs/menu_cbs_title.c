@@ -255,35 +255,25 @@ static int action_get_title_dropdown_item(
 				   STRLEN_CONST("core_option_")))
 	   {
 		   /* This is a core options item */
-		   struct string_list tmp_str_list = {0};
 		   core_option_manager_t *coreopts = NULL;
-
-		   string_list_initialize(&tmp_str_list);
-		   string_split_noalloc(&tmp_str_list, path, "_");
-
-		   if (tmp_str_list.size > 0)
+         const char *opt = strrchr(path, '_');
+		   if (opt)
 		   {
 			   retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts);
 
 			   if (coreopts)
 			   {
-				   unsigned option_index = string_to_unsigned(
-						   tmp_str_list.elems[(unsigned)tmp_str_list.size - 1].data);
+				   unsigned option_index = string_to_unsigned(opt+1);
 				   const char *title     = core_option_manager_get_desc(
 						   coreopts, option_index, true);
 
 				   if (s && !string_is_empty(title))
 				   {
 					   strlcpy(s, title, len);
-                  /* Clean up before returning */
-                  string_list_deinitialize(&tmp_str_list);
                   return 1;
 				   }
 			   }
 		   }
-
-		   /* Clean up */
-		   string_list_deinitialize(&tmp_str_list);
 	   }
 	   else
 	   {
@@ -333,6 +323,16 @@ static int action_get_title_dropdown_item(
 						   if ((enum_idx >= MENU_ENUM_LABEL_INPUT_DEVICE_INDEX) &&
 								   (enum_idx <= MENU_ENUM_LABEL_INPUT_DEVICE_INDEX_LAST))
 							   enum_idx = MENU_ENUM_LABEL_VALUE_INPUT_DEVICE_INDEX;
+
+						   /* Device Reservation Type */
+						   if ((enum_idx >= MENU_ENUM_LABEL_INPUT_DEVICE_RESERVATION_TYPE) &&
+								   (enum_idx <= MENU_ENUM_LABEL_INPUT_DEVICE_RESERVATION_TYPE_LAST))
+							   enum_idx = MENU_ENUM_LABEL_VALUE_INPUT_DEVICE_RESERVATION_TYPE;
+
+						   /* Reserved Device Name */
+						   if ((enum_idx >= MENU_ENUM_LABEL_INPUT_DEVICE_RESERVED_DEVICE_NAME) &&
+								   (enum_idx <= MENU_ENUM_LABEL_INPUT_DEVICE_RESERVED_DEVICE_NAME_LAST))
+							   enum_idx = MENU_ENUM_LABEL_VALUE_INPUT_DEVICE_RESERVED_DEVICE_NAME;
 
 						   /* Mouse Index */
 						   if ((enum_idx >= MENU_ENUM_LABEL_INPUT_MOUSE_INDEX) &&
@@ -1832,6 +1832,7 @@ int menu_cbs_init_bind_title(menu_file_list_cbs_t *cbs,
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DEVICE_TYPE,                        action_get_title_dropdown_item},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION,                        action_get_title_dropdown_input_description},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION_KBD,                    action_get_title_dropdown_input_description_kbd},
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_RESERVED_DEVICE,             action_get_title_dropdown_item},
 #ifdef ANDROID
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD,           action_get_title_dropdown_item},
 #endif

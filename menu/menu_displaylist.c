@@ -536,9 +536,6 @@ static int menu_displaylist_parse_core_info(
    const char *savestate_support = NULL;
    runloop_state_t *runloop_st   = runloop_state_get_ptr();
    bool kiosk_mode_enable        = settings->bools.kiosk_mode_enable;
-#if defined(HAVE_NETWORKING) && defined(HAVE_ONLINE_UPDATER)
-   bool menu_show_core_updater   = settings->bools.menu_show_core_updater;
-#endif
 #if defined(HAVE_DYNAMIC)
    enum menu_contentless_cores_display_type
          contentless_display_type = (enum menu_contentless_cores_display_type)
@@ -998,7 +995,7 @@ end:
           *   up in a situation where a core cannot be
           *   restored */
 #if defined(HAVE_NETWORKING) && defined(HAVE_ONLINE_UPDATER)
-         if (menu_show_core_updater && !core_locked)
+         if (settings->bools.menu_show_core_updater && !core_locked)
             if (menu_entries_append(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_DELETE),
                      core_path,
@@ -1136,7 +1133,6 @@ static unsigned menu_displaylist_parse_core_manager_list(file_list_t *list,
 {
    unsigned count                   = 0;
    core_info_list_t *core_info_list = NULL;
-   bool kiosk_mode_enable           = settings->bools.kiosk_mode_enable;
 
    /* Get core list */
    core_info_get_list(&core_info_list);
@@ -1198,7 +1194,7 @@ static unsigned menu_displaylist_parse_core_manager_list(file_list_t *list,
 
 #ifndef IOS
    /* Add 'sideload core' entry */
-   if (!kiosk_mode_enable)
+   if (!settings->bools.kiosk_mode_enable)
       if (menu_entries_append(list,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SIDELOAD_CORE_LIST),
             msg_hash_to_str(MENU_ENUM_LABEL_SIDELOAD_CORE_LIST),
@@ -1296,7 +1292,6 @@ static unsigned menu_displaylist_parse_core_option_dropdown_list(
    int j;
    char val_d[8];
    unsigned count                  = 0;
-   struct string_list tmp_str_list = {0};
    unsigned option_index           = 0;
    unsigned checked                = 0;
    bool checked_found              = false;
@@ -1307,6 +1302,7 @@ static unsigned menu_displaylist_parse_core_option_dropdown_list(
    const char *lbl_disabled        = NULL;
    const char *val_on_str          = NULL;
    const char *val_off_str         = NULL;
+   const char *opt                 = NULL;
 
    /* Fetch options */
    retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts);
@@ -1319,17 +1315,10 @@ static unsigned menu_displaylist_parse_core_option_dropdown_list(
    if (string_is_empty(info_path))
       return 0;
 
-   string_list_initialize(&tmp_str_list);
-   string_split_noalloc(&tmp_str_list, info_path, "_");
-
-   if (tmp_str_list.size < 1)
-   {
-      string_list_deinitialize(&tmp_str_list);
+   if (!(opt = strrchr(info_path, '_')))
       return 0;
-   }
 
-   option_index = string_to_unsigned(
-         tmp_str_list.elems[tmp_str_list.size - 1].data);
+   option_index = string_to_unsigned(opt+1);
    val_d[0]     = '\0';
    snprintf(val_d, sizeof(val_d), "%d", option_index);
 
@@ -1338,10 +1327,7 @@ static unsigned menu_displaylist_parse_core_option_dropdown_list(
    val    = core_option_manager_get_val(coreopts, option_index);
 
    if (!option || string_is_empty(val))
-   {
-      string_list_deinitialize(&tmp_str_list);
       return 0;
-   }
 
    lbl_enabled  = msg_hash_to_str(MENU_ENUM_LABEL_ENABLED);
    lbl_disabled = msg_hash_to_str(MENU_ENUM_LABEL_DISABLED);
@@ -1375,8 +1361,6 @@ static unsigned menu_displaylist_parse_core_option_dropdown_list(
          }
       }
    }
-
-   string_list_deinitialize(&tmp_str_list);
 
    if (checked_found)
    {
@@ -5560,6 +5544,111 @@ static int menu_displaylist_parse_input_device_type_list(
    }
 
    return count;
+}
+
+static int menu_displaylist_parse_input_select_reserved_device_list(
+      file_list_t *info_list, const char *info_path,
+      settings_t *settings)
+{
+    char device_label[256];
+    const char *val_disabled      = NULL;
+    enum msg_hash_enums enum_idx  = (enum msg_hash_enums)atoi(info_path);
+    struct menu_state *menu_st    = menu_state_get_ptr();
+    rarch_setting_t   *setting    = menu_setting_find_enum(enum_idx);
+    size_t menu_index             = 0;
+    unsigned count                = 0;
+    int i                         = 0;
+    char reserved_device_name[sizeof(settings->arrays.input_reserved_devices[0])];
+    bool device_added           = false;
+
+    device_label[0]               = '\0';
+
+    if (!settings || !setting)
+       return 0;
+
+    val_disabled = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NONE);
+    if (string_is_empty(settings->arrays.input_reserved_devices[enum_idx - MENU_ENUM_LABEL_INPUT_DEVICE_RESERVED_DEVICE_NAME]))
+        strlcpy(reserved_device_name, val_disabled, sizeof(reserved_device_name));
+    else
+        strlcpy(reserved_device_name, settings->arrays.input_reserved_devices[enum_idx - MENU_ENUM_LABEL_INPUT_DEVICE_RESERVED_DEVICE_NAME], sizeof(reserved_device_name));
+
+    /* List elements: none/disabled, all existing reservations, all existing devices */
+    for (i = MAX_INPUT_DEVICES+MAX_USERS; i >= 0; --i)
+    {
+        device_label[0] = '\0';
+
+        if (i == MAX_INPUT_DEVICES + MAX_USERS)
+            strlcpy(device_label, val_disabled, sizeof(device_label));
+        else if (i < MAX_INPUT_DEVICES)
+        {
+            const char *device_name =   input_config_get_device_display_name(i)
+                                      ? input_config_get_device_display_name(i)
+                                      : input_config_get_device_name(i);
+
+            if (!string_is_empty(device_name))
+            {
+                unsigned idx = input_config_get_device_name_index(i);
+                size_t _len  = strlcpy(device_label, device_name,
+                                       sizeof(device_label));
+                /* If idx is non-zero, it's part of a set*/
+                if (idx > 0)
+                    snprintf(device_label         + _len,
+                             sizeof(device_label) - _len, " (#%u)", idx);
+            }
+        }
+        else
+        {
+            if (!string_is_empty(settings->arrays.input_reserved_devices[i-MAX_INPUT_DEVICES]))
+            {
+                unsigned int vendor_id;
+                unsigned int product_id;
+                if (sscanf(settings->arrays.input_reserved_devices[i-MAX_INPUT_DEVICES], "%04x:%04x ", &vendor_id, &product_id) != 2)
+                    strlcpy(device_label, settings->arrays.input_reserved_devices[i-MAX_INPUT_DEVICES], sizeof(reserved_device_name));
+                else
+                    /* If the vendor_id:product_id is encoded in the name, ignore them. */
+                    strlcpy(device_label, &settings->arrays.input_reserved_devices[i-MAX_INPUT_DEVICES][10], sizeof(reserved_device_name));
+            }
+        }
+
+        if (!string_is_empty(device_label))
+        {
+            size_t previous_position;
+            if (file_list_search(info_list, device_label, &previous_position))
+                continue;
+
+            /* Add menu entry */
+            if (menu_entries_append(info_list,
+                                    device_label,
+                                    device_label,
+                                    MSG_UNKNOWN,
+                                    MENU_SETTING_DROPDOWN_ITEM_INPUT_SELECT_RESERVED_DEVICE,
+                                    0, menu_index, NULL))
+            {
+                /* Add checkmark if input is currently
+                 * mapped to this entry */
+                if (string_is_equal(device_label, reserved_device_name))
+                {
+                    menu_file_list_cbs_t *cbs = (menu_file_list_cbs_t*)info_list->list[menu_index].actiondata;
+                    if (cbs)
+                        cbs->checked        = true;
+                    menu_st->selection_ptr  = menu_index;
+                    device_added            = true;
+                }
+                count++;
+                menu_index++;
+            }
+        }
+    }
+
+    /* if nothing is configured, select None by default */
+    if (!device_added)
+    {
+        menu_file_list_cbs_t *cbs = (menu_file_list_cbs_t*)info_list->list[0].actiondata;
+        if (cbs)
+            cbs->checked          = true;
+        menu_st->selection_ptr    = 0;
+    }
+    return count;
 }
 
 #ifdef ANDROID
@@ -13982,6 +14071,20 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          case DISPLAYLIST_DROPDOWN_LIST_INPUT_DEVICE_TYPE:
             menu_entries_clear(info->list);
             count              = menu_displaylist_parse_input_device_type_list(info->list, info->path, settings);
+
+            if (count == 0)
+               if (menu_entries_append(info->list,
+                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_ENTRIES_TO_DISPLAY),
+                        msg_hash_to_str(MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY),
+                        MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
+                        FILE_TYPE_NONE, 0, 0, NULL))
+                  count++;
+            info->flags       |= MD_FLAG_NEED_REFRESH
+                               | MD_FLAG_NEED_PUSH;
+            break;
+         case DISPLAYLIST_DROPDOWN_LIST_INPUT_SELECT_RESERVED_DEVICE:
+            menu_entries_clear(info->list);
+            count              = menu_displaylist_parse_input_select_reserved_device_list(info->list, info->path, settings);
 
             if (count == 0)
                if (menu_entries_append(info->list,

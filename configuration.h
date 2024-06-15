@@ -151,6 +151,7 @@ typedef struct settings
 
       unsigned input_libretro_device[MAX_USERS];
       unsigned input_analog_dpad_mode[MAX_USERS];
+      unsigned input_device_reservation_type[MAX_USERS];
 
       unsigned input_remap_ports[MAX_USERS];
       unsigned input_remap_ids[MAX_USERS][RARCH_CUSTOM_BIND_LIST_END];
@@ -476,6 +477,8 @@ typedef struct settings
       char input_android_physical_keyboard[255];
 #endif
 
+      char input_reserved_devices[MAX_USERS][255];
+
       char audio_device[255];
       char camera_device[255];
       char netplay_mitm_server[255];
@@ -646,7 +649,7 @@ typedef struct settings
       bool audio_rate_control;
       bool audio_fastforward_mute;
       bool audio_fastforward_speedup;
-#ifdef TARGET_OS_IOS
+#ifdef IOS
       bool audio_respect_silent_mode;
 #endif
 
@@ -1069,7 +1072,7 @@ typedef struct settings
       bool android_input_disconnect_workaround;
 #endif
 
-#if defined(HAVE_COCOATOUCH) && defined(TARGET_OS_TV)
+#if defined(HAVE_COCOATOUCH)
       bool gcdwebserver_alert;
 #endif
    } bools;
