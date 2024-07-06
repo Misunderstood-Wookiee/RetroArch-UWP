@@ -1229,9 +1229,13 @@ MSG_HASH(
    "Дэструктыўная воблачная сінхранізацыя"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CLOUD_SYNC_SYNC_CONFIGS,
+   "Sync: Configuration Files"
+   )      
+MSG_HASH(
    MENU_ENUM_SUBLABEL_CLOUD_SYNC_DESTRUCTIVE,
    "Калі адключана, файлы будуць перасунутыя ў тэчку рэзервовай копіі перад іх перазапісам ці выдаленнем."
-   )
+   )      
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CLOUD_SYNC_DRIVER,
    "Бэкенд воблачнай сінхранізацыі"
@@ -2475,6 +2479,8 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_VIEWPORT_CUSTOM_Y,
    "Уласныя суадносіны бакоў (пазіцыя Y)"
    )
+#if defined(RARCH_MOBILE)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_VIEWPORT_CUSTOM_WIDTH,
    "Уласныя суадносіны бакоў (шырыня)"
@@ -3556,7 +3562,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_META_GRAB_MOUSE_TOGGLE,
-   "Захапляе або вызваляе мыш. Пры захопе сістэмны курсор схаваны ды абмежаваны акном RetroArch, тым самым паляпшаючы адносны ўвод мышы."
+   "Захапляе або вызваляе мыш. Пры захопе сістэмны курсор схаваны ды абмежаваны акном RetroArch, паляпшаючы адносны ўвод мышы."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_GAME_FOCUS_TOGGLE,
@@ -3575,6 +3581,10 @@ MSG_HASH(
    "Меню працоўнага стала (пераключэнне)"
    )
 
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_META_VRR_RUNLOOP_TOGGLE,
+   "Сінхранізацыя з частатой кадраў змесціва (пераключэнне)"
+   )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_RUNAHEAD_TOGGLE,
    "Забяганне (пераключэнне)"
@@ -3626,8 +3636,16 @@ MSG_HASH(
    "Вяртае налады прызначэнняў уводу да прадвызначаных значэнняў."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_SAVE_AUTOCONFIG,
+   "Захаваць профіль кантролера"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_MOUSE_INDEX,
    "Індэкс мышы"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_MOUSE_INDEX,
+   "Фізічная мыш, распазнаная RetroArch."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_B,
@@ -3677,9 +3695,21 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_R2,
    "Кнопка R2 (трыгер)"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TURBO_ENABLE,
+   "Турба"
+   )
 
 /* Settings > Latency */
 
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RUN_AHEAD_UNSUPPORTED,
+   "[Забяганне недаступнае]"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RUN_AHEAD_ENABLED,
+   "Забяганне для скарачэння латэнтнасці"
+   )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RUN_AHEAD_FRAMES,
    "Колькасць кадраў забягання"
@@ -3719,6 +3749,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_SET_SUPPORTS_NO_CONTENT_ENABLE,
    "Запускаць ядро аўтаматычна"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CORE_OPTION_CATEGORY_ENABLE,
+   "Катэгорыі опцый ядра"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CORE_INFO_CACHE_ENABLE,
+   "Кэшаванне файлаў звестак ядраў"
+   )
 #ifndef HAVE_DYNAMIC
 #endif
 MSG_HASH(
@@ -3735,6 +3773,10 @@ MSG_HASH(
    "Кіраванне ядрамі"
    )
 
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CORE_MANAGER_STEAM_LIST,
+   "Усталяваць ці выдаліць ядры, якія распаўсюджваюцца праз Steam."
+   )
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_STEAM_INSTALL,
@@ -3760,17 +3802,65 @@ MSG_HASH(
    "Усталяванне ядра: "
 )
 
+MSG_HASH(
+   MSG_CORE_STEAM_UNINSTALLED,
+   "Ядро будзе выдалена пры выхадзе з RetroArch."
+)
 
+MSG_HASH(
+   MSG_CORE_STEAM_CURRENTLY_DOWNLOADING,
+   "Ядро зараз сцягваецца"
+)
 #endif
 /* Settings > Configuration */
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CONFIG_SAVE_ON_EXIT,
-   "Захоўваць канфігурацыю падчас выхаду"
+   "Захаванне канфігурацыі падчас выхаду"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CONFIG_SAVE_ON_EXIT,
-   "Захоўваць змены ў файл канфігурацыі падчас выхаду."
+   "Захоўвае змены ў файл канфігурацыі падчас выхаду."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_REMAP_SAVE_ON_EXIT,
+   "Захаванне файлаў пераназначэнняў пры выхадзе"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_REMAP_SAVE_ON_EXIT,
+   "Захоўваць змены ў любым уваходным файле пераназначэнняў пры закрыцці змесціва або пры выхадзе з RetroArch."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_GAME_SPECIFIC_OPTIONS,
+   "Аўтаматычная загрузка адмысловых змесціву опцый ядра"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_GAME_SPECIFIC_OPTIONS,
+   "Загружаць дапасаваныя опцыі ядра па змаўчанні пры запуску."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AUTO_OVERRIDES_ENABLE,
+   "Аўтаматычная загрузка файлаў перавызначэнняў"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUTO_OVERRIDES_ENABLE,
+   "Загружаць дапасаваную канфігурацыю пры запуску."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AUTO_REMAPS_ENABLE,
+   "Аўтаматычная загрузка файлаў пераназначэнняў"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUTO_REMAPS_ENABLE,
+   "Загружаць дапасаванае кіраванне пры запуску."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INITIAL_DISK_CHANGE_ENABLE,
+   "Аўтаматычная загрузка файлаў індэксаў пачатковага дыска"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INITIAL_DISK_CHANGE_ENABLE,
+   "Пераходзіць да апошняга выкарыстанага дыска пры запуску шматдыскавага змесціва."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUTO_SHADERS_ENABLE,
@@ -3780,16 +3870,44 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_GLOBAL_CORE_OPTIONS,
    "Выкарыстанне глабальнага файла опцый ядра"
    )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_GLOBAL_CORE_OPTIONS,
+   "Захаваць усе опцыі ядра ў агульны файл налад (retroarch-core-options.cfg). Калі адключана, опцыі для кожнага ядра будуць захоўвацца ў асобны файл адмысловай ядру тэчкі ўнутры каталога 'Канфігурацыя' RetroArch."
+   )
 
 /* Settings > Saving */
 
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SORT_SAVEFILES_ENABLE,
+   "Сартаванне захаванняў па тэчкам з назваў ядраў"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SORT_SAVEFILES_ENABLE,
+   "Рассартоўваць файлы захаванняў па тэчкам з назвай выкарыстаных ядраў."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SORT_SAVESTATES_ENABLE,
-   "Рассартоўваць захоўванні станаў па тэчкам назваў ядраў"
+   "Сартаванне захаванняў станаў па тэчкам з назваў ядраў"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SORT_SAVESTATES_ENABLE,
+   "Рассартоўваць захаванні станаў па тэчкам з назвай выкарыстаных ядраў."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SORT_SAVEFILES_BY_CONTENT_ENABLE,
+   "Сартаванне захаванняў па тэчкам каталога змесціва"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SORT_SAVEFILES_BY_CONTENT_ENABLE,
+   "Рассартоўваць файлы захаванняў па тэчкам з назвай каталогаў, дзе размешчана змесціва."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SORT_SAVESTATES_BY_CONTENT_ENABLE,
-   "Рассартоўваць захоўванні станаў па тэчкам каталога змесціва"
+   "Сартаванне захаванняў станаў па тэчкам каталога змесціва"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SORT_SAVESTATES_BY_CONTENT_ENABLE,
+   "Рассартоўваць захаванні станаў па тэчкам з назвай каталогаў, дзе размешчана змесціва."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVESTATE_AUTO_INDEX,
