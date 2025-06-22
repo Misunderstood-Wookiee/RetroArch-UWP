@@ -27,11 +27,11 @@
 #define CTR_BOTTOM_FRAMEBUFFER_HEIGHT  240
 #define CTR_STATE_DATE_SIZE            11
 
-#define CTR_SET_SCALE_VECTOR(vec, viewport_width, viewport_height, texture_width, texture_height) \
-   (vec)->x = -2.0f / (viewport_width); \
-   (vec)->y = -2.0f / (viewport_height); \
-   (vec)->u =  1.0f / (texture_width); \
-   (vec)->v = -1.0f / (texture_height)
+#define CTR_SET_SCALE_VECTOR(vec, vp_width, vp_height, tex_width, tex_height) \
+   (vec)->x = -2.0f / (vp_width); \
+   (vec)->y = -2.0f / (vp_height); \
+   (vec)->u =  1.0f / (tex_width); \
+   (vec)->v = -1.0f / (tex_height)
 
 typedef enum
 {
@@ -79,21 +79,21 @@ typedef struct ctr_video
    struct
    {
       uint32_t* display_list;
-      int display_list_size;
       void* texture_linear;
       void* texture_swizzled;
+      ctr_vertex_t* frame_coords;
+      int display_list_size;
       int texture_width;
       int texture_height;
       ctr_scale_vector_t scale_vector;
-      ctr_vertex_t* frame_coords;
    }menu;
 
-   uint32_t* display_list;
+   uint32_t *display_list;
+   void *texture_linear;
+   void *texture_swizzled;
    int display_list_size;
-   void* texture_linear;
-   void* texture_swizzled;
-   int texture_width;
-   int texture_height;
+   unsigned int texture_width;
+   unsigned int texture_height;
 
    ctr_scale_vector_t scale_vector;
    ctr_vertex_t* frame_coords;
@@ -115,12 +115,11 @@ typedef struct ctr_video
    int current_buffer_top;
    int current_buffer_bottom;
 
-
    struct
    {
       ctr_vertex_t* buffer;
       ctr_vertex_t* current;
-      int size;
+      size_t size;
    }vertex_cache;
 
    int state_slot;
@@ -159,10 +158,10 @@ typedef struct ctr_video
 
 typedef struct ctr_texture
 {
-   int width;
-   int height;
-   int active_width;
-   int active_height;
+   unsigned int width;
+   unsigned int height;
+   unsigned int active_width;
+   unsigned int active_height;
 
    enum texture_filter_type type;
    void* data;
@@ -186,7 +185,7 @@ extern u8* gfxBottomFramebuffers[2];
 
 #ifdef CONSOLE_LOG
 extern PrintConsole* ctrConsole;
-#endif 
+#endif
 
 extern const u8 ctr_sprite_shbin[];
 extern const u32 ctr_sprite_shbin_size;

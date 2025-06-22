@@ -15,7 +15,6 @@
 
 #include <compat/strl.h>
 #include <file/file_path.h>
-#include <lists/string_list.h>
 #include <string/stdstring.h>
 
 #ifdef HAVE_CONFIG_H
@@ -40,6 +39,7 @@
 #endif
 #include "../../retroarch.h"
 #include "../../verbosity.h"
+#include "../../paths.h"
 #include "../../performance_counters.h"
 #include "../../playlist.h"
 #include "../../manual_content_scan.h"
@@ -83,9 +83,7 @@ static int action_start_remap_file_info(
       unsigned type, size_t idx, size_t entry_idx)
 {
    struct menu_state *menu_st            = menu_state_get_ptr();
-   settings_t *settings                  = config_get_ptr();
-   const char *directory_input_remapping = settings ?
-         settings->paths.directory_input_remapping : NULL;
+   const char *directory_input_remapping = config_get_ptr()->paths.directory_input_remapping;
    rarch_system_info_t *sys_info         = &runloop_state_get_ptr()->system;
 
    input_remapping_deinit(false);
@@ -488,7 +486,6 @@ static int action_start_state_slot(
       unsigned type, size_t idx, size_t entry_idx)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
-   size_t selection           = menu_st->selection_ptr;
    settings_t *settings       = config_get_ptr();
 
    settings->ints.state_slot  = 0;
@@ -497,7 +494,7 @@ static int action_start_state_slot(
    {
       if (menu_st->driver_ctx->update_savestate_thumbnail_path)
          menu_st->driver_ctx->update_savestate_thumbnail_path(
-               menu_st->userdata, (unsigned)selection);
+               menu_st->userdata, (unsigned)menu_st->selection_ptr);
       if (menu_st->driver_ctx->update_savestate_thumbnail_image)
          menu_st->driver_ctx->update_savestate_thumbnail_image(menu_st->userdata);
    }
@@ -603,6 +600,7 @@ static int action_start_video_resolution(
 
    if (video_driver_get_video_output_size(&width, &height, desc, sizeof(desc)))
    {
+      size_t _len;
       char msg[128];
       msg[0] = '\0';
 
@@ -612,19 +610,20 @@ static int action_start_video_resolution(
       video_driver_set_video_mode(width, height, true);
 #ifdef GEKKO
       if (width == 0 || height == 0)
-         strlcpy(msg, "Resetting to: DEFAULT", sizeof(msg));
+         _len = strlcpy(msg, "Resetting to: DEFAULT", sizeof(msg));
       else
 #endif
       {
          if (!string_is_empty(desc))
-            snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_SCREEN_RESOLUTION_RESETTING_DESC), 
+            _len = snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_SCREEN_RESOLUTION_RESETTING_DESC),
                width, height, desc);
          else
-            snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_SCREEN_RESOLUTION_RESETTING_NO_DESC), 
+            _len = snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_SCREEN_RESOLUTION_RESETTING_NO_DESC),
                width, height);
       }
 
-      runloop_msg_queue_push(msg, 1, 100, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+      runloop_msg_queue_push(msg, _len, 1, 100, true, NULL,
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
    }
 #endif
 
@@ -636,8 +635,8 @@ static int action_start_load_core(
       unsigned type, size_t idx, size_t entry_idx)
 {
    struct menu_state *menu_st  = menu_state_get_ptr();
-   int ret                     = generic_action_ok_command(
-         CMD_EVENT_UNLOAD_CORE);
+   int ret                     = generic_action_ok_command(CMD_EVENT_UNLOAD_CORE);
+   path_clear(RARCH_PATH_CORE_LAST);
    menu_st->flags             |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
                                |  MENU_ST_FLAG_PREVENT_POPULATE;
    return ret;
@@ -665,7 +664,7 @@ static int action_start_core_updater_entry(
     * information menu */
    if (   core_list
        && core_updater_list_get_filename(core_list, path, &entry)
-       && !string_is_empty(entry->local_core_path) 
+       && !string_is_empty(entry->local_core_path)
        && path_is_valid(entry->local_core_path))
       return action_ok_push_core_information_list(
             entry->local_core_path, label, type, idx, entry_idx);
@@ -713,15 +712,13 @@ static int action_start_core_lock(
       _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_UNLOCK_FAILED), sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
+         _len += strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       /* Generate log + notification */
       RARCH_ERR("%s\n", msg);
 
-      runloop_msg_queue_push(
-         msg,
-         1, 100, true,
-         NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+      runloop_msg_queue_push(msg, _len, 1, 100, true, NULL,
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
       ret = -1;
    }
@@ -773,15 +770,13 @@ static int action_start_core_set_standalone_exempt(
                sizeof(msg));
 
          if (!string_is_empty(core_name))
-            strlcpy(msg + _len, core_name, sizeof(msg) - _len);
+            _len += strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
          /* Generate log + notification */
          RARCH_ERR("%s\n", msg);
 
-         runloop_msg_queue_push(
-               msg,
-               1, 100, true,
-               NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         runloop_msg_queue_push(msg, _len, 1, 100, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
          return -1;
       }
@@ -804,6 +799,7 @@ static int menu_cbs_init_bind_start_compare_label(menu_file_list_cbs_t *cbs)
       switch (cbs->enum_idx)
       {
          case MENU_ENUM_LABEL_CORE_LIST:
+         case MENU_ENUM_LABEL_CORE_LIST_UNLOAD:
             BIND_ACTION_START(cbs, action_start_load_core);
             break;
          case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
@@ -900,6 +896,13 @@ static int menu_cbs_init_bind_start_compare_label(menu_file_list_cbs_t *cbs)
             break;
          case MENU_ENUM_LABEL_MENU_WALLPAPER:
             BIND_ACTION_START(cbs, action_start_menu_wallpaper);
+            break;
+         case MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY:
+         case MENU_ENUM_LABEL_GOTO_FAVORITES:
+         case MENU_ENUM_LABEL_GOTO_IMAGES:
+         case MENU_ENUM_LABEL_GOTO_MUSIC:
+         case MENU_ENUM_LABEL_GOTO_VIDEO:
+            BIND_ACTION_START(cbs, action_ok_push_playlist_manager_settings);
             break;
          default:
             return -1;

@@ -22,6 +22,7 @@
  */
 
 #define CINTERFACE
+#define WIN32_LEAN_AND_MEAN
 
 #include <string.h>
 #include <malloc.h>
@@ -881,7 +882,6 @@ static void d3d12_font_render_line(
    size_t i;
    D3D12_RANGE     range;
    unsigned        count;
-   void*           mapped_vbo       = NULL;
    d3d12_sprite_t* v                = NULL;
    d3d12_sprite_t* vbo_start        = NULL;
    int x                            = pre_x;
@@ -1151,6 +1151,7 @@ static uint32_t d3d12_get_flags(void *data)
 #if defined(HAVE_SLANG) && defined(HAVE_SPIRV_CROSS)
    BIT32_SET(flags, GFX_CTX_FLAGS_SHADERS_SLANG);
    BIT32_SET(flags, GFX_CTX_FLAGS_SUBFRAME_SHADERS);
+   BIT32_SET(flags, GFX_CTX_FLAGS_FAST_TOGGLE_SHADERS);
 #endif
 
    return flags;
@@ -1724,7 +1725,11 @@ static bool d3d12_gfx_set_shader(void* data, enum rarch_shader_type type, const 
             &d3d12->frame.output_size,       /* FinalViewportSize */
             &d3d12->pass[i].frame_count,     /* FrameCount */
             &d3d12->pass[i].frame_direction, /* FrameDirection */
+            &d3d12->pass[i].frame_time_delta,/* FrameTimeDelta */
+            &d3d12->pass[i].original_fps,    /* OriginalFPS */
             &d3d12->pass[i].rotation,        /* Rotation */
+            &d3d12->pass[i].core_aspect,     /* OriginalAspect */
+            &d3d12->pass[i].core_aspect_rot, /* OriginalAspectRotated */
             &d3d12->pass[i].total_subframes, /* TotalSubFrames */
             &d3d12->pass[i].current_subframe,/* CurrentSubFrame */
          }
@@ -2363,24 +2368,29 @@ static bool d3d12_init_swapchain(d3d12_video_t* d3d12,
    if (     (d3d12->flags & D3D12_ST_FLAG_WAITABLE_SWAPCHAINS)
          && (d3d12->chain.frameLatencyWaitableObject = DXGIGetFrameLatencyWaitableObject(d3d12->chain.handle)))
    {
-      settings_t* settings = config_get_ptr();
-      UINT max_latency     = settings->uints.video_max_frame_latency;
-      UINT cur_latency     = 0;
+      settings_t* settings      = config_get_ptr();
+      int8_t opt_latency        = settings->ints.video_max_frame_latency;
+      UINT max_latency          = 0;
+      UINT cur_latency          = 0;
 
-      if (max_latency == 0)
+      if (opt_latency < 1)
       {
-         d3d12->flags                |=  D3D12_ST_FLAG_WAIT_FOR_VBLANK;
-         max_latency                  = 1;
+         max_latency            = 1;
+         d3d12->wait_for_vblank = (!opt_latency) ? 1 : -1;
       }
       else
-         d3d12->flags                &= ~D3D12_ST_FLAG_WAIT_FOR_VBLANK;
+      {
+         max_latency            = opt_latency;
+         d3d12->wait_for_vblank = 0;
+      }
 
       DXGISetMaximumFrameLatency(d3d12->chain.handle, max_latency);
       DXGIGetMaximumFrameLatency(d3d12->chain.handle, &cur_latency);
       RARCH_LOG("[D3D12]: Requesting %u maximum frame latency, using %u%s.\n",
-            settings->uints.video_max_frame_latency,
+            max_latency,
             cur_latency,
-            (d3d12->flags & D3D12_ST_FLAG_WAIT_FOR_VBLANK) ? " with WaitForVBlank" : "");
+            ((d3d12->wait_for_vblank < 0) ? " with WaitForVBlank before Present" :
+             (d3d12->wait_for_vblank > 0) ? " with WaitForVBlank after Present"  : ""));
    }
 
 #ifdef HAVE_WINDOW
@@ -2907,7 +2917,8 @@ static void *d3d12_gfx_init(const video_info_t* video,
    else
       d3d12->flags &= ~D3D12_ST_FLAG_WAITABLE_SWAPCHAINS;
 
-   d3d_input_driver(settings->arrays.input_driver, settings->arrays.input_joypad_driver, input, input_data);
+   d3d_input_driver(settings->arrays.input_driver,
+         settings->arrays.input_joypad_driver, input, input_data);
 
    d3d12_init_base(d3d12);
    d3d12_init_descriptors(d3d12);
@@ -3128,7 +3139,7 @@ static void d3d12_init_render_targets(d3d12_video_t* d3d12, unsigned width, unsi
          height = d3d12->vp.height;
       }
 
-      RARCH_LOG("[D3D12]: Updating framebuffer size %ux%u.\n", width, height);
+      RARCH_DBG("[D3D12]: Updating framebuffer size %ux%u.\n", width, height);
 
       if (i == (d3d12->shader_preset->passes - 1))
       {
@@ -3204,7 +3215,7 @@ static void dx12_inject_black_frame(d3d12_video_t* d3d12)
 
    d3d12->queue.allocator->lpVtbl->Reset(d3d12->queue.allocator);
    cmd->lpVtbl->Reset(cmd, d3d12->queue.allocator,
-         d3d12->pipes[VIDEO_SHADER_STOCK_BLEND]); 
+         d3d12->pipes[VIDEO_SHADER_STOCK_BLEND]);
 
    d3d12->chain.frame_index = DXGIGetCurrentBackBufferIndex(
          d3d12->chain.handle);
@@ -3237,6 +3248,14 @@ static void dx12_inject_black_frame(d3d12_video_t* d3d12)
 
 }
 
+static INLINE void d3d12_wait_for_vblank(d3d12_video_t* d3d12)
+{
+   IDXGIOutput *pOutput;
+   DXGIGetContainingOutput(d3d12->chain.handle, &pOutput);
+   DXGIWaitForVBlank(pOutput);
+   Release(pOutput);
+}
+
 static bool d3d12_gfx_frame(
       void*               data,
       const void*         frame,
@@ -3251,7 +3270,6 @@ static bool d3d12_gfx_frame(
    d3d12_texture_t* texture       = NULL;
    d3d12_video_t*   d3d12         = (d3d12_video_t*)data;
    bool vsync                     = (d3d12->flags & D3D12_ST_FLAG_VSYNC) ? true : false;
-   bool wait_for_vblank           = (d3d12->flags & D3D12_ST_FLAG_WAIT_FOR_VBLANK) ? true : false;
    unsigned present_flags         = (vsync) ? 0 : DXGI_PRESENT_ALLOW_TEARING;
    const char *stat_text          = video_info->stat_text;
    bool statistics_show           = video_info->statistics_show;
@@ -3509,7 +3527,7 @@ static bool d3d12_gfx_frame(
       if (d3d12->flags & D3D12_ST_FLAG_RESIZE_RTS)
          d3d12_init_render_targets(d3d12, width, height);
 
-      if(frame == RETRO_HW_FRAME_BUFFER_VALID)
+      if (frame == RETRO_HW_FRAME_BUFFER_VALID)
       {
          D3D12_BOX src_box;
          D3D12_TEXTURE_COPY_LOCATION src, dst;
@@ -3559,7 +3577,7 @@ static bool d3d12_gfx_frame(
 
    texture = d3d12->frame.texture;
 
-   if (d3d12->shader_preset)
+   if (d3d12->shader_preset && video_info->shader_active)
    {
       cmd->lpVtbl->SetGraphicsRootSignature(cmd,
             d3d12->desc.sl_rootSignature);
@@ -3581,21 +3599,26 @@ static bool d3d12_gfx_frame(
          cmd->lpVtbl->SetPipelineState(cmd, d3d12->pass[i].pipe);
 
          if (d3d12->shader_preset->pass[i].frame_count_mod)
-            d3d12->pass[i].frame_count = frame_count
-                  % d3d12->shader_preset->pass[i].frame_count_mod;
+            d3d12->pass[i].frame_count = frame_count % d3d12->shader_preset->pass[i].frame_count_mod;
          else
             d3d12->pass[i].frame_count = frame_count;
 
 #ifdef HAVE_REWIND
-         if (state_manager_frame_is_reversed())
-            d3d12->pass[i].frame_direction = -1;
-         else
+         d3d12->pass[i].frame_direction  = state_manager_frame_is_reversed() ? -1 : 1;
+#else
+         d3d12->pass[i].frame_direction  = 1;
 #endif
-            d3d12->pass[i].frame_direction = 1;
+         d3d12->pass[i].frame_time_delta = (uint32_t)video_driver_get_frame_time_delta_usec();
+         d3d12->pass[i].original_fps     = video_driver_get_original_fps();
+         d3d12->pass[i].rotation         = retroarch_get_rotation();
+         d3d12->pass[i].core_aspect      = video_driver_get_core_aspect();
+         /* OriginalAspectRotated: return 1 / aspect for 90 and 270 rotated content */
+         d3d12->pass[i].core_aspect_rot  = d3d12->pass[i].core_aspect;
+         if (     d3d12->pass[i].rotation == VIDEO_ROTATION_90_DEG
+               || d3d12->pass[i].rotation == VIDEO_ROTATION_270_DEG)
+            d3d12->pass[i].core_aspect_rot = 1 / d3d12->pass[i].core_aspect_rot;
 
-         d3d12->pass[i].rotation = retroarch_get_rotation();
-
-         /* Sub-frame info for multiframe shaders (per real content frame). 
+         /* Sub-frame info for multiframe shaders (per real content frame).
             Should always be 1 for non-use of subframes */
          if (!(d3d12->flags & D3D12_ST_FLAG_FRAME_DUPE_LOCK))
          {
@@ -3751,7 +3774,7 @@ static bool d3d12_gfx_frame(
             cmd->lpVtbl->RSSetViewports(cmd, 1,
                   &d3d12->pass[i].viewport);
 
-#ifdef D3D12_ROLLING_SCANLINE_SIMULATION  
+#ifdef D3D12_ROLLING_SCANLINE_SIMULATION
             if (      (video_info->shader_subframes > 1)
                   &&  (video_info->scan_subframes)
                   &&  !black_frame_insertion
@@ -3763,20 +3786,20 @@ static bool d3d12_gfx_frame(
                D3D12_RECT scissor_rect;
 
                scissor_rect.left   = 0;
-               scissor_rect.top    = (unsigned int)(((float)d3d12->pass[i].viewport.Height / (float)video_info->shader_subframes) 
+               scissor_rect.top    = (unsigned int)(((float)d3d12->pass[i].viewport.Height / (float)video_info->shader_subframes)
                                        * (float)video_info->current_subframe);
                scissor_rect.right  = d3d12->pass[i].viewport.Width;
-               scissor_rect.bottom = (unsigned int)(((float)d3d12->pass[i].viewport.Height / (float)video_info->shader_subframes) 
+               scissor_rect.bottom = (unsigned int)(((float)d3d12->pass[i].viewport.Height / (float)video_info->shader_subframes)
                                        * (float)(video_info->current_subframe + 1));
 
                cmd->lpVtbl->RSSetScissorRects(cmd, 1, &scissor_rect);
             }
             else
-#endif // D3D12_ROLLING_SCANLINE_SIMULATION 
+#endif /* D3D12_ROLLING_SCANLINE_SIMULATION  */
             {
-               cmd->lpVtbl->RSSetScissorRects(cmd, 1, 
+               cmd->lpVtbl->RSSetScissorRects(cmd, 1,
 					&d3d12->pass[i].scissorRect);
-            } 
+            }
 
             if (i == d3d12->shader_preset->passes - 1)
                start_vertex_location = 0;
@@ -3864,7 +3887,7 @@ static bool d3d12_gfx_frame(
 
    cmd->lpVtbl->RSSetViewports(cmd, 1, &d3d12->frame.viewport);
 
-#ifdef D3D12_ROLLING_SCANLINE_SIMULATION  
+#ifdef D3D12_ROLLING_SCANLINE_SIMULATION
    if (      (video_info->shader_subframes > 1)
          &&  (video_info->scan_subframes)
          &&  !black_frame_insertion
@@ -3876,19 +3899,19 @@ static bool d3d12_gfx_frame(
       D3D12_RECT scissor_rect;
 
       scissor_rect.left   = 0;
-      scissor_rect.top    = (unsigned int)(((float)video_height / (float)video_info->shader_subframes) 
+      scissor_rect.top    = (unsigned int)(((float)video_height / (float)video_info->shader_subframes)
                               * (float)video_info->current_subframe);
       scissor_rect.right  = video_width ;
-      scissor_rect.bottom = (unsigned int)(((float)video_height / (float)video_info->shader_subframes) 
+      scissor_rect.bottom = (unsigned int)(((float)video_height / (float)video_info->shader_subframes)
                               * (float)(video_info->current_subframe + 1));
 
       cmd->lpVtbl->RSSetScissorRects(cmd, 1, &scissor_rect);
    }
    else
-#endif // D3D12_ROLLING_SCANLINE_SIMULATION 
+#endif /* D3D12_ROLLING_SCANLINE_SIMULATION  */
    {
       cmd->lpVtbl->RSSetScissorRects(cmd, 1, &d3d12->frame.scissorRect);
-   } 
+   }
 
    cmd->lpVtbl->DrawInstanced(cmd, 4, 1, 0, 0);
 
@@ -4033,15 +4056,17 @@ static bool d3d12_gfx_frame(
    cmd->lpVtbl->Close(cmd);
    d3d12->queue.handle->lpVtbl->ExecuteCommandLists(d3d12->queue.handle, 1,
          (ID3D12CommandList* const*)&d3d12->queue.cmd);
-   DXGIPresent(d3d12->chain.handle, d3d12->chain.swap_interval, present_flags);
 
-   if (vsync && wait_for_vblank)
+   if (vsync && d3d12->wait_for_vblank < 0)
    {
-      IDXGIOutput *pOutput;
-      DXGIGetContainingOutput(d3d12->chain.handle, &pOutput);
-      DXGIWaitForVBlank(pOutput);
-      Release(pOutput);
+      d3d12_wait_for_vblank(d3d12);
+      DXGIPresent(d3d12->chain.handle, 0, (present_flags | DXGI_PRESENT_ALLOW_TEARING));
    }
+   else
+      DXGIPresent(d3d12->chain.handle, d3d12->chain.swap_interval, present_flags);
+
+   if (vsync && d3d12->wait_for_vblank > 0)
+      d3d12_wait_for_vblank(d3d12);
 
    if (
            black_frame_insertion
@@ -4098,9 +4123,9 @@ static bool d3d12_gfx_frame(
       d3d12->flags |= D3D12_ST_FLAG_FRAME_DUPE_LOCK;
       for (k = 1; k < video_info->shader_subframes; k++)
       {
-#ifdef D3D12_ROLLING_SCANLINE_SIMULATION  
+#ifdef D3D12_ROLLING_SCANLINE_SIMULATION
          video_info->current_subframe = k;
-#endif // D3D12_ROLLING_SCANLINE_SIMULATION  
+#endif /* D3D12_ROLLING_SCANLINE_SIMULATION */
 
          if (d3d12->shader_preset)
             for (m = 0; m < d3d12->shader_preset->passes; m++)

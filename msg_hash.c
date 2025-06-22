@@ -42,11 +42,15 @@ int msg_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len)
 {
    int ret = msg_hash_get_help_us_enum(msg, s, len);
    /* Replace line-breaks with "empty line-breaks" for readability */
-   const char *temp = string_replace_substring(s,
+   const char *temp = string_replace_substring(s, strlen(s),
          "\n",    STRLEN_CONST("\n"),
          "\n \n", STRLEN_CONST("\n \n"));
 
-   strlcpy(s, temp, len);
+   if (temp)
+   {
+      strlcpy(s, temp, len);
+      free((void*)temp);
+   }
    return ret;
 }
 
@@ -134,6 +138,8 @@ const char *get_user_language_iso639_1(bool limit)
           return "gl";
       case RETRO_LANGUAGE_NORWEGIAN:
           return "no";
+      case RETRO_LANGUAGE_IRISH:
+          return "ga";
    }
    return "en";
 }
@@ -179,7 +185,7 @@ static const char *msg_hash_to_str_eo(enum msg_hash_enums msg)
 {
    switch (msg)
    {
-      #include "intl/msg_hash_eo.h"
+#include "intl/msg_hash_eo.h"
       default:
          break;
    }
@@ -287,7 +293,7 @@ static const char *msg_hash_to_str_nl(enum msg_hash_enums msg)
 {
    switch (msg)
    {
-      #include "intl/msg_hash_nl.h"
+#include "intl/msg_hash_nl.h"
       default:
          break;
    }
@@ -371,7 +377,7 @@ static const char *msg_hash_to_str_de(enum msg_hash_enums msg)
 {
    switch (msg)
    {
-      #include "intl/msg_hash_de.h"
+#include "intl/msg_hash_de.h"
       default:
          break;
    }
@@ -547,6 +553,17 @@ static const char *msg_hash_to_str_no(enum msg_hash_enums msg)
    return "null";
 }
 
+static const char *msg_hash_to_str_ga(enum msg_hash_enums msg)
+{
+   switch (msg)
+   {
+#include "intl/msg_hash_ga.h"
+      default:
+         break;
+   }
+
+   return "null";
+}
 #endif
 
 const char *msg_hash_to_str(enum msg_hash_enums msg)
@@ -657,6 +674,9 @@ const char *msg_hash_to_str(enum msg_hash_enums msg)
          break;
       case RETRO_LANGUAGE_NORWEGIAN:
          ret = msg_hash_to_str_no(msg);
+         break;
+      case RETRO_LANGUAGE_IRISH:
+         ret = msg_hash_to_str_ga(msg);
          break;
       default:
          break;
@@ -968,6 +988,6 @@ const char *msg_hash_get_wideglyph_str(void)
          break;
    }
 #endif
-   
+
    return NULL;
 }

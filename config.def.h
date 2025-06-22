@@ -69,6 +69,14 @@
 #define DEFAULT_ASPECT_RATIO 1.3333f
 #endif
 
+#define DEFAULT_VIEWPORT_BIAS_X 0.5
+#define DEFAULT_VIEWPORT_BIAS_Y 0.5
+
+#if defined(RARCH_MOBILE)
+#define DEFAULT_VIEWPORT_BIAS_PORTRAIT_X 0.5
+#define DEFAULT_VIEWPORT_BIAS_PORTRAIT_Y 0.0
+#endif
+
 #if defined(GEKKO)
 #define DEFAULT_MOUSE_SCALE 1
 #endif
@@ -148,6 +156,7 @@
  * > Helps to unify menu appearance when viewing
  *   thumbnails of different sizes */
 #define DEFAULT_MATERIALUI_THUMBNAIL_BACKGROUND_ENABLE true
+#define DEFAULT_MENU_THUMBNAIL_BACKGROUND_ENABLE false
 
 #define DEFAULT_SCREEN_BRIGHTNESS 100
 
@@ -158,6 +167,8 @@
 #define DEFAULT_CRT_SWITCH_CENTER_ADJUST 0
 
 #define DEFAULT_CRT_SWITCH_PORCH_ADJUST 0
+
+#define DEFAULT_CRT_SWITCH_VERTICAL_ADJUST 0
 
 #define DEFAULT_CRT_SWITCH_HIRES_MENU true
 
@@ -237,8 +248,8 @@
 /* Do not use windowed mode for WinRT and Winapi Family builds on the Xbox UWP with fixed resolution shrinks the image into the left top corner of the screen with some libretro cores */
 #define DEFAULT_WINDOWED_FULLSCREEN false
 #else
-#define DEFAULT_WINDOWED_FULLSCREEN true 
-#endif 
+#define DEFAULT_WINDOWED_FULLSCREEN true
+#endif
 
 /* Enable automatic switching of the screen refresh rate when using the specified screen mode(s),
  * based on running core/content */
@@ -360,6 +371,8 @@
 
 /* Vulkan specific */
 #define DEFAULT_MAX_SWAPCHAIN_IMAGES 3
+#define MINIMUM_MAX_SWAPCHAIN_IMAGES 2
+#define MAXIMUM_MAX_SWAPCHAIN_IMAGES 4
 
 /* D3D1x specific */
 #if defined(__WINRT__) || defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
@@ -383,16 +396,15 @@
  * 2: Etc ...
  */
 #define DEFAULT_HARD_SYNC_FRAMES 0
+#define MINIMUM_HARD_SYNC_FRAMES 0
+#define MAXIMUM_HARD_SYNC_FRAMES 3
 
 /* Sets how many milliseconds to delay after VSync before running the core.
  * Can reduce latency at cost of higher risk of stuttering.
  */
 #define DEFAULT_FRAME_DELAY 0
-#define MAXIMUM_FRAME_DELAY 19
+#define MAXIMUM_FRAME_DELAY 99
 #define DEFAULT_FRAME_DELAY_AUTO false
-
-/* Try to sleep the spare time after frame is presented in order to reduce vsync CPU usage. */
-#define DEFAULT_FRAME_REST false
 
 /* Duplicates frames for the purposes of running Shaders at a higher framerate
  * than content framerate. Requires running screen at multiple of 60hz, and
@@ -401,20 +413,20 @@
  */
 #define DEFAULT_SHADER_SUBFRAMES 1
 
-/* Divides implements basic rolling scanning of sub frames - does this simply by scrolling a 
- * a scissor rect down the screen according to how many sub frames there are  
+/* Divides implements basic rolling scanning of sub frames - does this simply by scrolling a
+ * a scissor rect down the screen according to how many sub frames there are
  */
 #define DEFAULT_SCAN_SUBFRAMES false
 
 /* Inserts black frame(s) inbetween frames.
- * Useful for Higher Hz monitors (set to multiples of 60 Hz) who want to play 60 Hz 
+ * Useful for Higher Hz monitors (set to multiples of 60 Hz) who want to play 60 Hz
  * material with CRT-like motion clarity.
  */
 #define DEFAULT_BLACK_FRAME_INSERTION 0
 
 /* Black Frame Insertion Dark Frames.
  * Increase for more clarity at the cost of lower brightness. Adjusting can also eliminate
- * any temporary image retention if noticed. Only useful at 180hz or higher 60hz multiples, 
+ * any temporary image retention if noticed. Only useful at 180hz or higher 60hz multiples,
  * as 120hz only has one total extra frame for BFI to work with.
  */
 #define DEFAULT_BFI_DARK_FRAMES 1
@@ -499,7 +511,7 @@
 /* Should we expand the colour gamut when using hdr */
 #define DEFAULT_VIDEO_HDR_EXPAND_GAMUT true
 
-/* When presets are saved they will be saved using the #reference 
+/* When presets are saved they will be saved using the #reference
  * directive by default */
 #define DEFAULT_VIDEO_SHADER_PRESET_SAVE_REFERENCE_ENABLE true
 
@@ -511,7 +523,8 @@
  * Overscale rounds up instead of down, default is downscale.
  */
 #define DEFAULT_SCALE_INTEGER false
-#define DEFAULT_SCALE_INTEGER_OVERSCALE false
+#define DEFAULT_SCALE_INTEGER_AXIS 0
+#define DEFAULT_SCALE_INTEGER_SCALING 0
 
 /* Controls aspect ratio handling. */
 
@@ -559,6 +572,7 @@
 #define DEFAULT_REMAP_SAVE_ON_EXIT true
 
 #define DEFAULT_SHOW_HIDDEN_FILES false
+#define DEFAULT_CORE_SUGGEST_ALWAYS false
 
 /* Initialise file browser with the last used start directory */
 #define DEFAULT_USE_LAST_START_DIRECTORY false
@@ -613,6 +627,8 @@
 #define DEFAULT_INPUT_OVERLAY_POINTER_ENABLE false
 #endif
 
+#define DEFAULT_INPUT_OVERLAY_ANALOG_RECENTER_ZONE 0
+
 #define DEFAULT_INPUT_OVERLAY_LIGHTGUN_PORT -1
 #define DEFAULT_INPUT_OVERLAY_LIGHTGUN_TRIGGER_ON_TOUCH true
 #define DEFAULT_INPUT_OVERLAY_LIGHTGUN_TRIGGER_DELAY 1
@@ -646,9 +662,19 @@
 #ifdef HAVE_OZONE
 /* Ozone colour theme: 1 == Basic Black */
 #define DEFAULT_OZONE_COLOR_THEME 1
+#define DEFAULT_OZONE_PADDING_FACTOR 1.0f
+#define DEFAULT_OZONE_HEADER_SEPARATOR 1
 #define DEFAULT_OZONE_COLLAPSE_SIDEBAR false
 #define DEFAULT_OZONE_SCROLL_CONTENT_METADATA false
 #define DEFAULT_OZONE_THUMBNAIL_SCALE_FACTOR 1.0f
+#define DEFAULT_OZONE_FONT_SCALE 0
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_GLOBAL 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_TITLE 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_SIDEBAR 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_LABEL 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_SUBLABEL 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_TIME 1.0f
+#define DEFAULT_OZONE_FONT_SCALE_FACTOR_FOOTER 1.0f
 #endif
 
 #if defined(HAVE_OZONE) || defined(HAVE_XMB)
@@ -752,6 +778,9 @@
 #define DEFAULT_MENU_TICKER_SPEED 2.0f
 #define DEFAULT_MENU_TICKER_SMOOTH true
 
+/* Don't skip rendering assets based on the absence of other assets */
+#define DEFAULT_MENU_IGNORE_MISSING_ASSETS false
+
 #if defined(HAVE_THREADS)
 #define DEFAULT_MENU_SAVESTATE_RESUME true
 #else
@@ -778,6 +807,7 @@
 #define DEFAULT_CONTENT_SHOW_SETTINGS true
 #define DEFAULT_CONTENT_SHOW_HISTORY true
 #define DEFAULT_CONTENT_SHOW_FAVORITES true
+#define DEFAULT_CONTENT_SHOW_FAVORITES_FIRST false
 #ifdef HAVE_IMAGEVIEWER
 #define DEFAULT_CONTENT_SHOW_IMAGES true
 #endif
@@ -793,14 +823,10 @@
 #endif
 #endif
 
-/* Specifies 'add content' visibility when using
- * menus WITH a dedicated 'Import Content' tab */
-#define DEFAULT_MENU_CONTENT_SHOW_ADD true
-/* Specifies 'add content' visibility when using
- * menus WITHOUT a dedicated 'Import Content' tab */
 #define DEFAULT_MENU_CONTENT_SHOW_ADD_ENTRY MENU_ADD_CONTENT_ENTRY_DISPLAY_PLAYLISTS_TAB
 
 #define DEFAULT_CONTENT_SHOW_PLAYLISTS true
+#define DEFAULT_CONTENT_SHOW_PLAYLIST_TABS true
 
 #if defined(HAVE_LIBRETRODB)
 #define DEFAULT_MENU_CONTENT_SHOW_EXPLORE true
@@ -915,7 +941,11 @@
 #define DEFAULT_INPUT_BACKTOUCH_TOGGLE false
 #endif
 
+#if defined(ANDROID) || defined(IOS)
 #define DEFAULT_OVERLAY_ENABLE_AUTOPREFERRED true
+#else
+#define DEFAULT_OVERLAY_ENABLE_AUTOPREFERRED false
+#endif
 
 #if defined(HAVE_OVERLAY)
 #if defined(RARCH_MOBILE)
@@ -1075,6 +1105,10 @@
 #define DEFAULT_NOTIFICATION_SHOW_AUTOCONFIG true
 #endif
 
+/* Display a notification when controller
+ * autoconfiguration fails. */
+#define DEFAULT_NOTIFICATION_SHOW_AUTOCONFIG_FAILS true
+
 /* Display a notification when cheats are being
  * applied */
 #define DEFAULT_NOTIFICATION_SHOW_CHEATS_APPLIED true
@@ -1112,7 +1146,7 @@
 /*Desired duration of the screenshot notification*/
 #define DEFAULT_NOTIFICATION_SHOW_SCREENSHOT_DURATION 0
 
-/* Display a white flashing effect with the desired 
+/* Display a white flashing effect with the desired
  * duration when taking a screenshot*/
 #define DEFAULT_NOTIFICATION_SHOW_SCREENSHOT_FLASH 0
 #endif
@@ -1155,7 +1189,7 @@
 
 /* Desired audio latency in milliseconds. Might not be honored
  * if driver can't provide given latency. */
-#if defined(ANDROID) || defined(EMSCRIPTEN) || defined(RETROFW) || defined(MIYOO)
+#if defined(ANDROID) || defined(RETROFW) || defined(MIYOO) || (defined(EMSCRIPTEN) && defined(HAVE_AL))
 /* For most Android devices, 64ms is way too low. */
 #define DEFAULT_OUT_LATENCY 128
 #define DEFAULT_IN_LATENCY 128
@@ -1165,12 +1199,7 @@
 #endif
 
 /* Will sync audio. (recommended) */
-#ifdef IOS
-/* FIXME: coreaudio will cause the main thread to hang on backgrounding, causing a crash */
-#define DEFAULT_AUDIO_SYNC false
-#else
 #define DEFAULT_AUDIO_SYNC true
-#endif
 
 /* Audio rate control. */
 #if !defined(RARCH_CONSOLE)
@@ -1206,12 +1235,12 @@
 #define DEFAULT_AUDIO_RESPECT_SILENT_MODE true
 #endif
 
-/* Automatically mute audio when fast forward
- * is enabled */
+/* Automatically mute audio when fast forward is enabled. */
 #define DEFAULT_AUDIO_FASTFORWARD_MUTE false
-/* Speed up audio to match fast-forward speed up.
- * Avoids crackling */
+/* Speed up audio to match fast forward speed up. */
 #define DEFAULT_AUDIO_FASTFORWARD_SPEEDUP false
+/* Automatically mute audio when rewind is enabled. */
+#define DEFAULT_AUDIO_REWIND_MUTE false
 
 #ifdef HAVE_MICROPHONE
 /* Microphone support */
@@ -1258,9 +1287,9 @@
 
 
 #if defined(RETROFW) || defined(MIYOO)
-/*RETROFW jz4760 has signficant slowdown with default settings */
+/*RETROFW jz4760 has significant slowdown with default settings */
 #define DEFAULT_REWIND_BUFFER_SIZE (1 << 20)
-#define DEFAULT_REWIND_BUFFER_SIZE_STEP 1 
+#define DEFAULT_REWIND_BUFFER_SIZE_STEP 1
 #define DEFAULT_REWIND_GRANULARITY 6
 #else
 /* The buffer size for the rewind buffer. This needs to be about
@@ -1275,11 +1304,7 @@
 #endif
 
 /* Pause gameplay when window loses focus. */
-#if defined(EMSCRIPTEN)
-#define DEFAULT_PAUSE_NONACTIVE false
-#else
 #define DEFAULT_PAUSE_NONACTIVE true
-#endif
 
 /* Pause gameplay when controller disconnects. */
 #define DEFAULT_PAUSE_ON_DISCONNECT false
@@ -1388,7 +1413,12 @@
 #define DEFAULT_SAVESTATE_AUTO_SAVE false
 #define DEFAULT_SAVESTATE_AUTO_LOAD false
 
+/* Take screenshots for save states */
+#if defined(__x86_64__)
+#define DEFAULT_SAVESTATE_THUMBNAIL_ENABLE true
+#else
 #define DEFAULT_SAVESTATE_THUMBNAIL_ENABLE false
+#endif
 
 /* When creating save (srm) files, compress
  * written data */
@@ -1413,14 +1443,7 @@
 #define DEFAULT_FASTFORWARD_FRAMESKIP true
 
 /* Enable runloop for variable refresh rate screens. Force x1 speed while handling fast forward too. */
-#ifdef IOS
-/* FIXME: coreaudio will cause the main thread to hang on backgrounding, causing
- * a crash. the fix is to turn off audio synchronization. with that off, we need
- * this on */
-#define DEFAULT_VRR_RUNLOOP_ENABLE true
-#else
 #define DEFAULT_VRR_RUNLOOP_ENABLE false
-#endif
 
 /* Run core logic one or more frames ahead then load the state back to reduce perceived input lag. */
 #define DEFAULT_RUN_AHEAD_FRAMES 1
@@ -1430,8 +1453,6 @@
 
 /* Hide warning messages when using the Run Ahead feature. */
 #define DEFAULT_RUN_AHEAD_HIDE_WARNINGS false
-/* Hide warning messages when using Preemptive Frames. */
-#define DEFAULT_PREEMPT_HIDE_WARNINGS   false
 
 /* Enable stdin/network command interface. */
 #define DEFAULT_NETWORK_CMD_ENABLE false
@@ -1456,11 +1477,7 @@
  * a new one) */
 #define DEFAULT_CORE_UPDATER_AUTO_BACKUP_HISTORY_SIZE 1
 
-#if defined(ANDROID) || defined(__APPLE__)
-#define DEFAULT_NETWORK_ON_DEMAND_THUMBNAILS true
-#else
 #define DEFAULT_NETWORK_ON_DEMAND_THUMBNAILS false
-#endif
 
 /* Number of entries that will be kept in content history playlist file. */
 #define DEFAULT_CONTENT_HISTORY_SIZE 200
@@ -1515,10 +1532,12 @@
 
 #define DEFAULT_PLAYLIST_USE_FILENAME false
 
+#define DEFAULT_PLAYLIST_ALLOW_NON_PNG false
+
 /* Show Menu start-up screen on boot. */
 #define DEFAULT_MENU_SHOW_START_SCREEN true
 
-/* Default scale factor for non-frambuffer-based display
+/* Default scale factor for non-framebuffer-based display
  * drivers and display widgets */
 #if defined(VITA)
 #define DEFAULT_MENU_SCALE_FACTOR 1.5f
@@ -1564,11 +1583,13 @@
 #define DEFAULT_ANALOG_SENSITIVITY 1.0f
 
 /* Describes speed of which turbo-enabled buttons toggle. */
+#define DEFAULT_TURBO_ENABLE true
 #define DEFAULT_TURBO_PERIOD 6
-#define DEFAULT_TURBO_DUTY_CYCLE 3
+#define DEFAULT_TURBO_DUTY_CYCLE 0
 #define DEFAULT_TURBO_MODE 0
-#define DEFAULT_TURBO_DEFAULT_BTN RETRO_DEVICE_ID_JOYPAD_B
-#define DEFAULT_ALLOW_TURBO_DPAD false
+#define DEFAULT_TURBO_BIND -1
+#define DEFAULT_TURBO_BUTTON RETRO_DEVICE_ID_JOYPAD_B
+#define DEFAULT_TURBO_ALLOW_DPAD false
 
 /* Enable automatic mouse grab by default
  * only on Android */
@@ -1614,7 +1635,11 @@
 #endif
 
 #define DEFAULT_INPUT_BIND_TIMEOUT 3
+#if defined(ANDROID)
+#define DEFAULT_INPUT_BIND_HOLD 1
+#else
 #define DEFAULT_INPUT_BIND_HOLD 0
+#endif
 #define DEFAULT_INPUT_POLL_TYPE_BEHAVIOR 2
 #define DEFAULT_INPUT_HOTKEY_BLOCK_DELAY 5
 #define DEFAULT_INPUT_HOTKEY_DEVICE_MERGE false
@@ -1622,6 +1647,7 @@
 #define DEFAULT_GFX_THUMBNAILS_DEFAULT 3
 
 #define DEFAULT_MENU_LEFT_THUMBNAILS_DEFAULT 0
+#define DEFAULT_MENU_ICON_THUMBNAILS_DEFAULT 0
 
 #define DEFAULT_GFX_THUMBNAIL_UPSCALE_THRESHOLD 0
 
@@ -1666,7 +1692,7 @@
 #define DEFAULT_CONTENT_RUNTIME_LOG true
 #endif
 
-/* Keep track of how long each content has been running 
+/* Keep track of how long each content has been running
  * for over time (ignores core) */
 #define DEFAULT_CONTENT_RUNTIME_LOG_AGGREGATE false
 
@@ -1674,7 +1700,7 @@
 
 #if defined(__QNX__) || defined(_XBOX1) || defined(_XBOX360) || (defined(__MACH__) && defined(IOS)) || defined(ANDROID) || defined(WIIU) || defined(HAVE_NEON) || defined(GEKKO) || defined(__ARM_NEON__) || defined(__PS3__)
 #define DEFAULT_AUDIO_RESAMPLER_QUALITY_LEVEL RESAMPLER_QUALITY_LOWER
-#elif defined(PSP) || defined(_3DS) || defined(VITA) || defined(PS2) || defined(DINGUX) || defined(EMSCRIPTEN)
+#elif defined(PSP) || defined(_3DS) || defined(VITA) || defined(PS2) || defined(DINGUX)
 #define DEFAULT_AUDIO_RESAMPLER_QUALITY_LEVEL RESAMPLER_QUALITY_LOWEST
 #else
 #define DEFAULT_AUDIO_RESAMPLER_QUALITY_LEVEL RESAMPLER_QUALITY_NORMAL
@@ -1697,13 +1723,17 @@
 /* Only applies to Android 7.0 (API 24) and up */
 #define DEFAULT_SUSTAINED_PERFORMANCE_MODE false
 
-#if defined(ANDROID)
+#if defined(ANDROID) || defined(IOS)
 #define DEFAULT_VIBRATE_ON_KEYPRESS true
 #else
 #define DEFAULT_VIBRATE_ON_KEYPRESS false
 #endif
 
+#if defined(IOS)
+#define DEFAULT_ENABLE_DEVICE_VIBRATION true
+#else
 #define DEFAULT_ENABLE_DEVICE_VIBRATION false
+#endif
 
 /* Defines the strength of rumble effects
  * on OpenDingux devices */
@@ -1753,11 +1783,19 @@
 #define DEFAULT_BUILDBOT_SERVER_URL "http://buildbot.libretro.com/nightly/apple/ios/latest/"
 #elif defined(OSX)
 #if defined(__x86_64__)
+#if defined(HAVE_SSL)
+#define DEFAULT_BUILDBOT_SERVER_URL "https://buildbot.libretro.com/nightly/apple/osx/x86_64/latest/"
+#else
 #define DEFAULT_BUILDBOT_SERVER_URL "http://buildbot.libretro.com/nightly/apple/osx/x86_64/latest/"
+#endif
 #elif defined(__i386__) || defined(__i486__) || defined(__i686__)
 #define DEFAULT_BUILDBOT_SERVER_URL "http://bot.libretro.com/nightly/apple/osx/x86/latest/"
 #elif defined(__aarch64__)
+#if defined(HAVE_SSL)
+#define DEFAULT_BUILDBOT_SERVER_URL "https://buildbot.libretro.com/nightly/apple/osx/arm64/latest/"
+#else
 #define DEFAULT_BUILDBOT_SERVER_URL "http://buildbot.libretro.com/nightly/apple/osx/arm64/latest/"
+#endif
 #else
 #define DEFAULT_BUILDBOT_SERVER_URL "http://buildbot.libretro.com/nightly/apple/osx/ppc/latest/"
 #endif
@@ -1821,7 +1859,11 @@
 #define DEFAULT_BUILDBOT_SERVER_URL ""
 #endif
 
+#ifdef EMSCRIPTEN
+#define DEFAULT_BUILDBOT_ASSETS_SERVER_URL "https://buildbot.libretro.com/assets/"
+#else
 #define DEFAULT_BUILDBOT_ASSETS_SERVER_URL "http://buildbot.libretro.com/assets/"
+#endif
 
 #define DEFAULT_DISCORD_APP_ID "475456035851599874"
 

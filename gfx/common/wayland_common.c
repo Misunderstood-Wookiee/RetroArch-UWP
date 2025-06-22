@@ -34,7 +34,6 @@
 
 #define SPLASH_SHM_NAME "retroarch-wayland-vk-splash"
 
-#define APP_ID "org.libretro.RetroArch"
 #define WINDOW_TITLE "RetroArch"
 
 #ifdef HAVE_LIBDECOR_H
@@ -43,6 +42,10 @@
 
 #define DEFAULT_WINDOWED_WIDTH 640
 #define DEFAULT_WINDOWED_HEIGHT 480
+
+/* Icon is 16x15 scaled by 16 */
+#define SPLASH_WINDOW_WIDTH 240
+#define SPLASH_WINDOW_HEIGHT 256
 
 #ifndef MFD_CLOEXEC
 #define MFD_CLOEXEC		0x0001U
@@ -136,7 +139,6 @@ void xdg_toplevel_handle_configure_common(gfx_ctx_wayland_data_t *wl,
          /* Stretch old buffer to fill new size, commit/roundtrip to apply */
          wp_viewport_set_destination(wl->viewport, wl->width, wl->height);
          wl_surface_commit(wl->surface);
-         wl_display_roundtrip(wl->input.dpy);
       }
    }
 
@@ -209,7 +211,6 @@ void libdecor_frame_handle_configure_common(struct libdecor_frame *frame,
          /* Stretch old buffer to fill new size, commit/roundtrip to apply */
          wp_viewport_set_destination(wl->viewport, wl->width, wl->height);
          wl_surface_commit(wl->surface);
-         wl_display_roundtrip(wl->input.dpy);
       }
    }
 
@@ -294,6 +295,10 @@ void gfx_ctx_wl_destroy_resources_common(gfx_ctx_wayland_data_t *wl)
       zxdg_toplevel_decoration_v1_destroy(wl->deco);
    if (wl->xdg_toplevel)
       xdg_toplevel_destroy(wl->xdg_toplevel);
+   if (wl->xdg_toplevel_icon_manager)
+      xdg_toplevel_icon_manager_v1_destroy(wl->xdg_toplevel_icon_manager);
+   if (wl->xdg_toplevel_icon)
+      xdg_toplevel_icon_v1_destroy(wl->xdg_toplevel_icon);
    if (wl->xdg_surface)
       xdg_surface_destroy(wl->xdg_surface);
    if (wl->surface)
@@ -314,6 +319,16 @@ void gfx_ctx_wl_destroy_resources_common(gfx_ctx_wayland_data_t *wl)
       zwp_pointer_constraints_v1_destroy(wl->pointer_constraints);
    if (wl->relative_pointer_manager)
       zwp_relative_pointer_manager_v1_destroy (wl->relative_pointer_manager);
+   if (wl->content_type_manager)
+      wp_content_type_manager_v1_destroy (wl->content_type_manager);
+   if (wl->content_type)
+      wp_content_type_v1_destroy (wl->content_type);
+   if (wl->cursor_shape_manager)
+      wp_cursor_shape_manager_v1_destroy (wl->cursor_shape_manager);
+   if (wl->cursor_shape_device)
+      wp_cursor_shape_device_v1_destroy (wl->cursor_shape_device);
+   if (wl->single_pixel_manager)
+      wp_single_pixel_buffer_manager_v1_destroy (wl->single_pixel_manager);
    if (wl->seat)
       wl_seat_destroy(wl->seat);
    if (wl->xdg_shell)
@@ -352,25 +367,32 @@ void gfx_ctx_wl_destroy_resources_common(gfx_ctx_wayland_data_t *wl)
       wl_display_disconnect(wl->input.dpy);
    }
 
-   wl->input.dpy                = NULL;
-   wl->registry                 = NULL;
-   wl->compositor               = NULL;
-   wl->shm                      = NULL;
-   wl->data_device_manager      = NULL;
-   wl->xdg_shell                = NULL;
-   wl->seat                     = NULL;
-   wl->relative_pointer_manager = NULL;
-   wl->pointer_constraints      = NULL;
-   wl->idle_inhibit_manager     = NULL;
-   wl->deco_manager             = NULL;
-   wl->surface                  = NULL;
-   wl->xdg_surface              = NULL;
-   wl->xdg_toplevel             = NULL;
-   wl->deco                     = NULL;
-   wl->idle_inhibitor           = NULL;
-   wl->wl_touch                 = NULL;
-   wl->wl_pointer               = NULL;
-   wl->wl_keyboard              = NULL;
+   wl->input.dpy                 = NULL;
+   wl->registry                  = NULL;
+   wl->compositor                = NULL;
+   wl->shm                       = NULL;
+   wl->data_device_manager       = NULL;
+   wl->xdg_shell                 = NULL;
+   wl->seat                      = NULL;
+   wl->relative_pointer_manager  = NULL;
+   wl->pointer_constraints       = NULL;
+   wl->content_type              = NULL;
+   wl->content_type_manager      = NULL;
+   wl->cursor_shape_manager      = NULL;
+   wl->cursor_shape_device       = NULL;
+   wl->idle_inhibit_manager      = NULL;
+   wl->deco_manager              = NULL;
+   wl->single_pixel_manager      = NULL;
+   wl->surface                   = NULL;
+   wl->xdg_surface               = NULL;
+   wl->xdg_toplevel              = NULL;
+   wl->xdg_toplevel_icon         = NULL;
+   wl->xdg_toplevel_icon_manager = NULL;
+   wl->deco                      = NULL;
+   wl->idle_inhibitor            = NULL;
+   wl->wl_touch                  = NULL;
+   wl->wl_pointer                = NULL;
+   wl->wl_keyboard               = NULL;
 
    wl->width                    = 0;
    wl->height                   = 0;
@@ -449,8 +471,13 @@ bool gfx_ctx_wl_get_metrics_common(void *data,
 static int create_shm_file(off_t size)
 {
    int fd, ret;
+#ifndef __FreeBSD__
    if ((fd = syscall(SYS_memfd_create, SPLASH_SHM_NAME,
                MFD_CLOEXEC | MFD_ALLOW_SEALING)) >= 0)
+#else
+   if ((fd = memfd_create(SPLASH_SHM_NAME,
+               MFD_CLOEXEC | MFD_ALLOW_SEALING)) >= 0)
+#endif
    {
       fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
 
@@ -530,7 +557,7 @@ static shm_buffer_t *create_shm_buffer(gfx_ctx_wayland_data_t *wl, int width,
    buffer->data      = data;
    buffer->data_size = size;
 
-   return buffer;
+      return buffer;
 }
 
 static void shm_buffer_paint_icon(
@@ -565,6 +592,45 @@ static void shm_buffer_paint_icon(
    }
 }
 
+static bool wl_create_toplevel_icon(gfx_ctx_wayland_data_t *wl, struct xdg_toplevel *toplevel)
+{
+   struct xdg_toplevel_icon_v1 *icon = xdg_toplevel_icon_manager_v1_create_icon(
+      wl->xdg_toplevel_icon_manager);
+   xdg_toplevel_icon_v1_set_name(icon, WAYLAND_APP_ID);
+
+   const int icon_size = wl->buffer_scale > 1 ? 128 : 64;
+   shm_buffer_t *icon_buffer = create_shm_buffer(wl,
+      icon_size, icon_size, WL_SHM_FORMAT_ARGB8888);
+
+   if (icon_buffer)
+   {
+      shm_buffer_paint_icon(icon_buffer, icon_size, icon_size, 1, icon_size / 16);
+      xdg_toplevel_icon_v1_add_buffer(
+         icon, icon_buffer->wl_buffer, 1);
+   }
+   else
+   {
+      RARCH_ERR("[Wayland] Failed to create toplevel icon buffer\n");
+      return false;
+   }
+
+   xdg_toplevel_icon_manager_v1_set_icon(
+      wl->xdg_toplevel_icon_manager, toplevel, icon);
+
+#ifdef HAVE_LIBDECOR_H
+   if (wl->libdecor_frame)
+   {
+      wl->libdecor_icon = icon;
+   }
+   else
+#endif
+   {
+      wl->xdg_toplevel_icon = icon;
+   }
+
+   return true;
+}
+
 static void shm_buffer_paint_checkerboard(
       shm_buffer_t *buffer,
       int width, int height, int scale,
@@ -596,27 +662,47 @@ static void shm_buffer_paint_checkerboard(
 
 static bool wl_draw_splash_screen(gfx_ctx_wayland_data_t *wl)
 {
-   shm_buffer_t *buffer = create_shm_buffer(wl,
-      wl->buffer_width,
-      wl->buffer_height,
-      WL_SHM_FORMAT_XRGB8888);
+   if (wl->single_pixel_manager)
+   {
+      struct wl_buffer *buffer = NULL;
+      buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+         wl->single_pixel_manager, 0, 0, 0, UINT32_MAX);
 
-   if (!buffer)
-     return false;
+      if (!buffer)
+         return false;
 
-   shm_buffer_paint_checkerboard(buffer, wl->buffer_width,
-      wl->buffer_height, 1,
-      8, 0xffbcbcbc, 0xff8e8e8e);
-   shm_buffer_paint_icon(buffer, wl->buffer_width,
-      wl->buffer_height, 1,
-      16);
+      wl_surface_attach(wl->surface, buffer, 0, 0);
+   }
+   else
+   {
+      shm_buffer_t *buffer = create_shm_buffer(wl,
+         wl->buffer_width,
+         wl->buffer_height,
+         WL_SHM_FORMAT_XRGB8888);
 
-   wl_surface_attach(wl->surface, buffer->wl_buffer, 0, 0);
+      if (!buffer)
+         return false;
+
+      shm_buffer_paint_checkerboard(buffer, wl->buffer_width,
+         wl->buffer_height, 1,
+         8, 0xffbcbcbc, 0xff8e8e8e);
+      shm_buffer_paint_icon(buffer, wl->buffer_width,
+         wl->buffer_height, 1,
+         16);
+
+      wl_surface_attach(wl->surface, buffer->wl_buffer, 0, 0);
+   }
+
    if (wl_surface_get_version(wl->surface) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
       wl_surface_damage_buffer(wl->surface, 0, 0,
          wl->buffer_width,
          wl->buffer_height);
+
+   if (wl->viewport)
+      wp_viewport_set_destination(wl->viewport, wl->width, wl->height);
+
    wl_surface_commit(wl->surface);
+
    return true;
 }
 
@@ -691,7 +777,7 @@ bool gfx_ctx_wl_init_common(
 
    if (!wl->idle_inhibit_manager)
    {
-      RARCH_LOG("[Wayland]: Compositor doesn't support zwp_idle_inhibit_manager_v1 protocol\n");
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", zwp_idle_inhibit_manager_v1_interface.name);
 #ifdef HAVE_DBUS
       dbus_ensure_connection();
 #endif
@@ -699,18 +785,64 @@ bool gfx_ctx_wl_init_common(
 
    if (!wl->deco_manager)
    {
-      RARCH_LOG("[Wayland]: Compositor doesn't support zxdg_decoration_manager_v1 protocol\n");
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", zxdg_decoration_manager_v1_interface.name);
+   }
+
+   if (!wl->viewporter)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", wp_viewporter_interface.name);
+   }
+
+   if (!wl->fractional_scale_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", wp_fractional_scale_manager_v1_interface.name);
+   }
+
+   if (!wl->cursor_shape_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", wp_cursor_shape_manager_v1_interface.name);
+   }
+
+   if (!wl->content_type_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", wp_content_type_manager_v1_interface.name);
+   }
+
+   if (!wl->pointer_constraints)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", zwp_pointer_constraints_v1_interface.name);
+   }
+
+   if (!wl->relative_pointer_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", zwp_relative_pointer_manager_v1_interface.name);
+   }
+
+   if (!wl->single_pixel_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", wp_single_pixel_buffer_manager_v1_interface.name);
+   }
+
+   if (!wl->xdg_toplevel_icon_manager)
+   {
+      RARCH_LOG("[Wayland]: Compositor doesn't support the %s protocol!\n", xdg_toplevel_icon_manager_v1_interface.name);
    }
 
    wl->surface = wl_compositor_create_surface(wl->compositor);
    if (wl->viewporter)
       wl->viewport = wp_viewporter_get_viewport(wl->viewporter, wl->surface);
+
    if (wl->fractional_scale_manager)
    {
       wl->fractional_scale = wp_fractional_scale_manager_v1_get_fractional_scale(
            wl->fractional_scale_manager, wl->surface);
       wp_fractional_scale_v1_add_listener(wl->fractional_scale, &wp_fractional_scale_v1_listener, wl);
-      RARCH_LOG("[Wayland]: fractional_scale_v1 enabled\n");
+   }
+
+   if (wl->content_type_manager)
+   {
+      wl->content_type = wp_content_type_manager_v1_get_surface_content_type(wl->content_type_manager, wl->surface);
+      wp_content_type_v1_set_content_type(wl->content_type, WP_CONTENT_TYPE_V1_TYPE_GAME);
    }
 
    wl_surface_add_listener(wl->surface, &wl_surface_listener, wl);
@@ -727,7 +859,13 @@ bool gfx_ctx_wl_init_common(
          goto error;
       }
 
-      wl->libdecor_frame_set_app_id(wl->libdecor_frame, APP_ID);
+      if (wl->xdg_toplevel_icon_manager)
+      {
+         struct xdg_toplevel *xdg_toplevel = wl->libdecor_frame_get_xdg_toplevel(wl->libdecor_frame);
+         wl_create_toplevel_icon(wl, xdg_toplevel);
+      }
+
+      wl->libdecor_frame_set_app_id(wl->libdecor_frame, WAYLAND_APP_ID);
       wl->libdecor_frame_set_title(wl->libdecor_frame, WINDOW_TITLE);
       wl->libdecor_frame_map(wl->libdecor_frame);
 
@@ -753,12 +891,15 @@ bool gfx_ctx_wl_init_common(
       wl->xdg_toplevel = xdg_surface_get_toplevel(wl->xdg_surface);
       xdg_toplevel_add_listener(wl->xdg_toplevel, &toplevel_listener->xdg_toplevel_listener, wl);
 
-      xdg_toplevel_set_app_id(wl->xdg_toplevel, APP_ID);
+      xdg_toplevel_set_app_id(wl->xdg_toplevel, WAYLAND_APP_ID);
       xdg_toplevel_set_title(wl->xdg_toplevel, WINDOW_TITLE);
 
       if (wl->deco_manager)
          wl->deco = zxdg_decoration_manager_v1_get_toplevel_decoration(
                wl->deco_manager, wl->xdg_toplevel);
+
+      if (wl->xdg_toplevel_icon_manager)
+         wl_create_toplevel_icon(wl, wl->xdg_toplevel);
 
       /* Waiting for xdg_toplevel to be configured before starting to draw */
       wl_surface_commit(wl->surface);
@@ -773,7 +914,7 @@ bool gfx_ctx_wl_init_common(
 
    /* Bind SHM based wl_buffer to wl_surface until the vulkan surface is ready.
     * This shows the window which assigns us a display (wl_output)
-    *  which is usefull for HiDPI and auto selecting a display for fullscreen. */
+    * which is useful for HiDPI and auto selecting a display for fullscreen. */
    if (video_monitor_index == 0 && wl_list_length (&wl->all_outputs) > 1)
    {
       if (!wl_draw_splash_screen(wl))
@@ -852,13 +993,12 @@ bool gfx_ctx_wl_set_video_mode_common_size(gfx_ctx_wayland_data_t *wl,
    {
       /* Stretch old buffer to fill new size, commit/roundtrip to apply */
       wp_viewport_set_destination(wl->viewport, wl->width, wl->height);
-      wl_surface_commit(wl->surface);
-      wl_display_roundtrip(wl->input.dpy);
    }
 
 #ifdef HAVE_LIBDECOR_H
    if (wl->libdecor)
    {
+     wl->libdecor_frame_set_visibility(wl->libdecor_frame, !fullscreen);
      struct libdecor_state *state = wl->libdecor_state_new(wl->width, wl->height);
      wl->libdecor_frame_commit(wl->libdecor_frame, state, NULL);
      wl->libdecor_state_free(state);

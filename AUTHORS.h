@@ -315,7 +315,7 @@ Mike Swanson (chungy)
 mikeOSX
 minucce
 misson20000
-Mohmoud (esoptron) (Hedonium)
+esoptron
 Monroe88
 Morgane (MorganeAD)
 mprobinson
@@ -481,6 +481,7 @@ vaguerant
 Val Packett (valpackett)
 Valerio Proietti (kamicane)
 vgmoose
+Viachaslau Khalikin (viachaslavic)
 Vicki Pfau (endrift)
 Vicky C Lau (vickychenglau)
 vin (suseme)

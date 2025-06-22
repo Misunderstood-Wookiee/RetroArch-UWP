@@ -56,39 +56,34 @@ static int action_bind_label_playlist_collection_entry(
       const char *label, const char *path,
       char *s, size_t len)
 {
-   const char *playlist_file = NULL;
-
-   if (string_is_empty(path))
-      return 0;
-
-   playlist_file = path_basename_nocompression(path);
-
-   if (string_is_empty(playlist_file))
-      return 0;
-
-   if (string_is_equal_noncase(path_get_extension(playlist_file),
-            "lpl"))
+   if (!string_is_empty(path))
    {
-      /* Handle content history */
-      if (string_is_equal(playlist_file, FILE_PATH_CONTENT_HISTORY))
-         strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_HISTORY_TAB), len);
-      /* Handle favourites */
-      else if (string_is_equal(playlist_file, FILE_PATH_CONTENT_FAVORITES))
-         strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_FAVORITES_TAB), len);
-      /* Handle collection playlists */
-      else
-      {
-         char playlist_name[PATH_MAX_LENGTH];
-         strlcpy(playlist_name, playlist_file, sizeof(playlist_name));
-         path_remove_extension(playlist_name);
+      const char *playlist_file = path_basename_nocompression(path);
 
-         strlcpy(s, playlist_name, len);
+      if (!string_is_empty(playlist_file))
+      {
+         if (string_is_equal_noncase(path_get_extension(playlist_file),
+                  "lpl"))
+         {
+            if (string_is_equal(playlist_file, FILE_PATH_CONTENT_HISTORY))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_HISTORY_TAB), len);
+            else if (string_is_equal(playlist_file, FILE_PATH_CONTENT_FAVORITES))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_FAVORITES_TAB), len);
+            else if (string_is_equal(playlist_file, FILE_PATH_CONTENT_IMAGE_HISTORY))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_IMAGES_TAB), len);
+            else if (string_is_equal(playlist_file, FILE_PATH_CONTENT_MUSIC_HISTORY))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MUSIC_TAB), len);
+            else if (string_is_equal(playlist_file, FILE_PATH_CONTENT_VIDEO_HISTORY))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_TAB), len);
+            else
+               fill_pathname(s, playlist_file, "", len);
+         }
+         /* This should never happen, but if it does just set
+          * the label to the file name (it's better than nothing...) */
+         else
+            strlcpy(s, playlist_file, len);
       }
    }
-   /* This should never happen, but if it does just set
-    * the label to the file name (it's better than nothing...) */
-   else
-      strlcpy(s, playlist_file, len);
 
    return 0;
 }
@@ -117,6 +112,11 @@ int menu_cbs_init_bind_label(menu_file_list_cbs_t *cbs,
    {
       switch (cbs->enum_idx)
       {
+         case MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY:
+         case MENU_ENUM_LABEL_GOTO_FAVORITES:
+         case MENU_ENUM_LABEL_GOTO_IMAGES:
+         case MENU_ENUM_LABEL_GOTO_MUSIC:
+         case MENU_ENUM_LABEL_GOTO_VIDEO:
          case MENU_ENUM_LABEL_PLAYLIST_COLLECTION_ENTRY:
             BIND_ACTION_LABEL(cbs, action_bind_label_playlist_collection_entry);
             break;

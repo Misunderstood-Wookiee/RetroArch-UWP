@@ -1,6 +1,8 @@
 #ifndef COCOA_APPLE_PLATFORM_H
 #define COCOA_APPLE_PLATFORM_H
 
+extern bool RAIsVoiceOverRunning(void);
+
 #if TARGET_OS_TV
 #include "config_file.h"
 extern config_file_t *open_userdefaults_config_file(void);
@@ -10,9 +12,16 @@ extern void update_topshelf(void);
 
 #if TARGET_OS_IOS
 extern void ios_show_file_sheet(void);
+extern bool ios_running_on_ipad(void);
+#endif
+
+#if TARGET_OS_OSX
+extern void osx_show_file_sheet(void);
 #endif
 
 #ifdef __OBJC__
+
+#import <Foundation/Foundation.h>
 
 #ifdef HAVE_METAL
 #import <Metal/Metal.h>
@@ -51,8 +60,8 @@ typedef enum apple_view_type
  * the displays should not sleep.
  */
 - (bool)setDisableDisplaySleep:(bool)disable;
-#if defined(HAVE_COCOA_METAL) && !defined(HAVE_COCOATOUCH)
-- (void)updateWindowedMode;
+#if !defined(HAVE_COCOATOUCH)
+- (void)openDocument:(id)sender;
 #endif
 @end
 
@@ -67,6 +76,14 @@ extern id apple_platform;
 #if defined(HAVE_COCOATOUCH)
 void rarch_start_draw_observer(void);
 void rarch_stop_draw_observer(void);
+
+#if defined(HAVE_COCOA_METAL)
+@interface MetalLayerView : UIView
+@property (nonatomic, readonly) CAMetalLayer *metalLayer;
+@end
+#endif
+
+#import <UIKit/UIKit.h>
 
 @interface RetroArch_iOS : UINavigationController<ApplePlatform, UIApplicationDelegate,
 UINavigationControllerDelegate> {
@@ -84,9 +101,12 @@ UINavigationControllerDelegate> {
 - (void)showGameView;
 - (void)supportOtherAudioSessions;
 
-- (void)refreshSystemConfig;
 @end
+
 #else
+
+#import <AppKit/AppKit.h>
+
 #if defined(HAVE_COCOA_METAL)
 @interface RetroArch_OSX : NSObject<ApplePlatform, NSApplicationDelegate> {
 #elif (defined(__MACH__)  && defined(MAC_OS_X_VERSION_MAX_ALLOWED) && (MAC_OS_X_VERSION_MAX_ALLOWED < 101200))

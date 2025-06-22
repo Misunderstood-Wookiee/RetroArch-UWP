@@ -261,7 +261,7 @@ static int udev_add_pad(struct udev_device *dev, unsigned p, int fd, const char 
                by testing if the axis initial value is negative, allowing for
                for some slop (1300 =~ 4%) in an axis centred around 0.
                The actual work is done in udev_joypad_axis.
-               All bets are off if you're sitting on it. Reinitailise it by unpluging
+               All bets are off if you're sitting on it. Reinitialise it by unpluging
                and plugging back in. */
             if (udev_compute_axis(abs, abs->value) < -1300)
               pad->neg_trigger[i] = true;
@@ -520,17 +520,18 @@ static void udev_joypad_poll(void)
 
    for (p = 0; p < MAX_USERS; p++)
    {
-      int i, len;
+      int i;
+      ssize_t _len;
       struct input_event events[32];
       struct udev_joypad *pad = &udev_pads[p];
 
       if (pad->fd < 0)
          continue;
 
-      while ((len = read(pad->fd, events, sizeof(events))) > 0)
+      while ((_len = read(pad->fd, events, sizeof(events))) > 0)
       {
-         len /= sizeof(*events);
-         for (i = 0; i < len; i++)
+         _len /= sizeof(*events);
+         for (i = 0; i < _len; i++)
          {
             uint16_t type = events[i].type;
             uint16_t code = events[i].code;
@@ -795,8 +796,10 @@ input_device_driver_t udev_joypad = {
 #ifndef HAVE_LAKKA_SWITCH
    udev_set_rumble_gain,
 #else
-   NULL,
+   NULL, /* set_rumble_gain */
 #endif
+   NULL, /* set_sensor_state */
+   NULL, /* get_sensor_input */
    udev_joypad_name,
    "udev",
 };

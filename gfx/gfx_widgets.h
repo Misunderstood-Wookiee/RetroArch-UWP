@@ -116,10 +116,12 @@ enum disp_widget_flags_enum
    DISPWIDG_FLAG_UNFOLDING                 = (1 << 7),
    /* Color style */
    DISPWIDG_FLAG_POSITIVE                  = (1 << 8),
-   DISPWIDG_FLAG_NEGATIVE                  = (1 << 9)
+   DISPWIDG_FLAG_NEGATIVE                  = (1 << 9),
+   DISPWIDG_FLAG_CATEGORY_WARNING          = (1 << 10),
+   DISPWIDG_FLAG_CATEGORY_ERROR            = (1 << 11)
 };
 
-/* There can only be one message animation at a time to 
+/* There can only be one message animation at a time to
  * avoid confusing users */
 enum dispgfx_widget_flags
 {
@@ -246,7 +248,8 @@ typedef struct dispgfx_widget
 
    uint8_t flags;
 
-   char assets_pkg_dir[PATH_MAX_LENGTH];
+   char gfx_widgets_status_text[NAME_MAX_LENGTH];
+   char assets_pkg_dir[DIR_MAX_LENGTH];
    char xmb_path[PATH_MAX_LENGTH];                /* TODO/FIXME - decouple from XMB */
    char ozone_path[PATH_MAX_LENGTH];              /* TODO/FIXME - decouple from Ozone */
    char ozone_regular_font_path[PATH_MAX_LENGTH]; /* TODO/FIXME - decouple from Ozone */
@@ -254,7 +257,6 @@ typedef struct dispgfx_widget
 
    char monochrome_png_path[PATH_MAX_LENGTH];
    char gfx_widgets_path[PATH_MAX_LENGTH];
-   char gfx_widgets_status_text[255];
 
    bool active;
 } dispgfx_widget_t;
@@ -351,6 +353,7 @@ void gfx_widgets_deinit(bool widgets_persisting);
 
 void gfx_widgets_msg_queue_push(
       retro_task_t *task, const char *msg,
+      size_t len,
       unsigned duration,
       char *title,
       enum message_queue_icon icon,

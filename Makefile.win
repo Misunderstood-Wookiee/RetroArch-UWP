@@ -89,6 +89,7 @@ AVUTIL_LIBS      := -lavutil
 SWSCALE_LIBS     := -lswscale
 AVFORMAT_LIBS    := -lavformat
 SWRESAMPLE_LIBS  := -lswresample
+AVDEVICE_LIBS    := -lavdevice
 FFMPEG_LIBS      := -lws2_32 -lz
 endif
 
@@ -131,8 +132,8 @@ ifeq ($(DEBUG), 1)
    CFLAGS += -O0 -g
    CXXFLAGS += -O0 -g
 else
-   CFLAGS += -O3 -ffast-math
-   CXXFLAGS += -O3 -ffast-math
+   CFLAGS += -O3
+   CXXFLAGS += -O3
 endif
 
 CFLAGS += $(DEF_FLAGS) -Wall -Wno-unused-result -Wno-unused-variable -I. -Ideps

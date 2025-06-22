@@ -1,4 +1,4 @@
-﻿#include <QCloseEvent>
+#include <QCloseEvent>
 #include <QSettings>
 #include <QResizeEvent>
 #include <QMessageBox>
@@ -79,9 +79,11 @@ static inline bool comp_string_lower(const QString &lhs, const QString &rhs)
    return lhs.toLower() < rhs.toLower();
 }
 
-static inline bool comp_hash_ui_display_name_key_lower(const QHash<QString, QString> &lhs, const QHash<QString, QString> &rhs)
+static inline bool comp_hash_ui_display_name_key_lower(const QHash<QString,
+		QString> &lhs, const QHash<QString, QString> &rhs)
 {
-   return lhs.value("ui_display_name").toLower() < rhs.value("ui_display_name").toLower();
+   return    lhs.value("ui_display_name").toLower()
+	   < rhs.value("ui_display_name").toLower();
 }
 
 PlaylistEntryDialog::PlaylistEntryDialog(MainWindow *mainwindow, QWidget *parent) :
@@ -93,14 +95,19 @@ PlaylistEntryDialog::PlaylistEntryDialog(MainWindow *mainwindow, QWidget *parent
    ,m_extensionsLineEdit(new QLineEdit(this))
    ,m_coreComboBox(new QComboBox(this))
    ,m_databaseComboBox(new QComboBox(this))
-   ,m_extensionArchiveCheckBox(new QCheckBox(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_FILTER_INSIDE_ARCHIVES), this))
+   ,m_extensionArchiveCheckBox(new QCheckBox(
+            msg_hash_to_str(
+               MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_FILTER_INSIDE_ARCHIVES),
+            this))
 {
    QFormLayout *form                = new QFormLayout();
-   QDialogButtonBox *buttonBox      = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+   QDialogButtonBox *buttonBox      = new QDialogButtonBox(
+         QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
    QVBoxLayout *databaseVBoxLayout  = new QVBoxLayout();
    QHBoxLayout *pathHBoxLayout      = new QHBoxLayout();
    QHBoxLayout *extensionHBoxLayout = new QHBoxLayout();
-   QLabel *databaseLabel            = new QLabel(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_FOR_THUMBNAILS), this);
+   QLabel *databaseLabel            = new QLabel(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_FOR_THUMBNAILS), this);
    QToolButton *pathPushButton      = new QToolButton(this);
 
    pathPushButton->setText(QStringLiteral("..."));
@@ -114,10 +121,14 @@ PlaylistEntryDialog::PlaylistEntryDialog(MainWindow *mainwindow, QWidget *parent
    extensionHBoxLayout->addWidget(m_extensionsLineEdit);
    extensionHBoxLayout->addWidget(m_extensionArchiveCheckBox);
 
-   m_extensionsLineEdit->setPlaceholderText(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_EXTENSIONS_PLACEHOLDER));
+   m_extensionsLineEdit->setPlaceholderText(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_EXTENSIONS_PLACEHOLDER));
 
    /* Ensure placeholder text is completely visible. */
-   m_extensionsLineEdit->setMinimumWidth(QFontMetrics(m_extensionsLineEdit->font()).boundingRect(m_extensionsLineEdit->placeholderText()).width() + m_extensionsLineEdit->frameSize().width());
+   m_extensionsLineEdit->setMinimumWidth(QFontMetrics(
+            m_extensionsLineEdit->font()).boundingRect(
+            m_extensionsLineEdit->placeholderText()).width()
+          + m_extensionsLineEdit->frameSize().width());
 
    setWindowTitle(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY));
 
@@ -132,11 +143,16 @@ PlaylistEntryDialog::PlaylistEntryDialog(MainWindow *mainwindow, QWidget *parent
    connect(this, SIGNAL(accepted()), this, SLOT(onAccepted()));
    connect(this, SIGNAL(rejected()), this, SLOT(onRejected()));
 
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_NAME), m_nameLineEdit);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_PATH), pathHBoxLayout);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_CORE), m_coreComboBox);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_DATABASE), databaseVBoxLayout);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_EXTENSIONS), extensionHBoxLayout);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_NAME), m_nameLineEdit);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_PATH), pathHBoxLayout);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_CORE), m_coreComboBox);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_DATABASE), databaseVBoxLayout);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_PLAYLIST_ENTRY_EXTENSIONS), extensionHBoxLayout);
 
    qobject_cast<QVBoxLayout*>(layout())->addLayout(form);
    layout()->addItem(new QSpacerItem(20, 20, QSizePolicy::Minimum, QSizePolicy::Expanding));
@@ -173,8 +189,8 @@ void PlaylistEntryDialog::loadPlaylistOptions()
    m_coreComboBox->addItem(
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_CORE_SELECTION_ASK));
    m_databaseComboBox->addItem(
-           QString("<") 
-         + msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE) 
+           QString("<")
+         + msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
          + ">",
          QFileInfo(m_mainwindow->getCurrentPlaylistPath()).fileName().remove(".lpl"));
 
@@ -277,7 +293,9 @@ void PlaylistEntryDialog::setEntryValues(
 
    for (i = 0; i < m_coreComboBox->count(); i++)
    {
-      const QHash<QString, QString> hash = m_coreComboBox->itemData(i, Qt::UserRole).value<QHash<QString, QString> >();
+      const QHash<QString, QString> hash =
+         m_coreComboBox->itemData(i,
+               Qt::UserRole).value<QHash<QString, QString> >();
 
       if (hash.isEmpty() || coreName.isEmpty())
          continue;
@@ -302,7 +320,8 @@ void PlaylistEntryDialog::setEntryValues(
 
 const QHash<QString, QString> PlaylistEntryDialog::getSelectedCore()
 {
-   return m_coreComboBox->currentData(Qt::UserRole).value<QHash<QString, QString> >();
+   return m_coreComboBox->currentData(
+         Qt::UserRole).value<QHash<QString, QString> >();
 }
 
 const QString PlaylistEntryDialog::getSelectedName()
@@ -331,27 +350,15 @@ const QStringList PlaylistEntryDialog::getSelectedExtensions()
    return list;
 }
 
-void PlaylistEntryDialog::onAccepted()
-{
-}
-
-void PlaylistEntryDialog::onRejected()
-{
-}
+void PlaylistEntryDialog::onAccepted() { }
+void PlaylistEntryDialog::onRejected() { }
+void PlaylistEntryDialog::hideDialog() { reject(); }
 
 bool PlaylistEntryDialog::showDialog(const QHash<QString, QString> &hash)
 {
    loadPlaylistOptions();
    setEntryValues(hash);
-
-   if (exec() == QDialog::Accepted)
-      return true;
-   return false;
-}
-
-void PlaylistEntryDialog::hideDialog()
-{
-   reject();
+   return (exec() == QDialog::Accepted);
 }
 
 CoreInfoDialog::CoreInfoDialog(MainWindow *mainwindow, QWidget *parent) :
@@ -378,10 +385,9 @@ CoreInfoDialog::CoreInfoDialog(MainWindow *mainwindow, QWidget *parent) :
 
 void CoreInfoDialog::showCoreInfo()
 {
-   int      row  = 0;
+   int i, row;
    int row_count = m_formLayout->rowCount();
-   int       i   = 0;
-   QVector<QHash<QString, QString> > info_list 
+   QVector<QHash<QString, QString> > info_list
                  = m_mainwindow->getCoreInfo();
 
    if (row_count > 0)
@@ -392,7 +398,7 @@ void CoreInfoDialog::showCoreInfo()
          /* removeRow() and takeRow() was only added in 5.8! */
          m_formLayout->removeRow(0);
 #else
-         /* something is buggy here... 
+         /* something is buggy here...
           * sometimes items appear duplicated, and other times not */
          QLayoutItem *item = m_formLayout->itemAt(0);
          QWidget        *w = NULL;
@@ -444,7 +450,8 @@ void CoreInfoDialog::showCoreInfo()
 QPixmap getColorizedPixmap(const QPixmap& oldPixmap, const QColor& color)
 {
    QPixmap pixmap = oldPixmap;
-   QBitmap   mask = pixmap.createMaskFromColor(Qt::transparent, Qt::MaskInColor);
+   QBitmap   mask = pixmap.createMaskFromColor(Qt::transparent,
+         Qt::MaskInColor);
    pixmap.fill(color);
    pixmap.setMask(mask);
    return pixmap;
@@ -455,7 +462,7 @@ QColor getLabelColor(const QString& objectName)
    QLabel dummyColor;
    dummyColor.setObjectName(objectName);
    dummyColor.ensurePolished();
-   return dummyColor.palette().color(QPalette::Foreground);
+   return dummyColor.palette().color(QPalette::WindowText);
 }
 
 /* stolen from Qt Creator */
@@ -482,7 +489,7 @@ private:
 
          /* Widget wants to be bigger than available space */
          if (innerSizeHint.height() > innerSize.height())
-         { 
+         {
             innerSize.setWidth(innerSize.width() - scrollBarWidth());
             innerSize.setHeight(innerSizeHint.height());
          }
@@ -528,7 +535,8 @@ private:
    }
 };
 
-ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
+ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow,
+      QWidget *parent) :
    QDialog(mainwindow)
    ,m_optionsList(new QListWidget(this))
    ,m_optionsStack(new QStackedLayout)
@@ -536,14 +544,19 @@ ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
    int width;
    QGridLayout        *layout = new QGridLayout(this);
    QLabel      *m_headerLabel = new QLabel(this);
-   /* Header label with large font and a bit of spacing 
+   /* Header label with large font and a bit of spacing
     * (align with group boxes) */
    QFont      headerLabelFont = m_headerLabel->font();
    const int        pointSize = headerLabelFont.pointSize();
    QHBoxLayout *headerHLayout = new QHBoxLayout;
-   const int       leftMargin = QApplication::style()->pixelMetric(QStyle::PM_LayoutLeftMargin);
+   const int       leftMargin = QApplication::style()->pixelMetric(
+         QStyle::PM_LayoutLeftMargin);
 
+#if (QT_VERSION > QT_VERSION_CHECK(6, 0, 0))
+   m_optionsStack->setContentsMargins(0, 0, 0, 0);
+#else
    m_optionsStack->setMargin(0);
+#endif
 
    headerLabelFont.setBold(true);
 
@@ -553,7 +566,8 @@ ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
 
    m_headerLabel->setFont(headerLabelFont);
 
-   headerHLayout->addSpacerItem(new QSpacerItem(leftMargin, 0, QSizePolicy::Fixed, QSizePolicy::Ignored));
+   headerHLayout->addSpacerItem(new QSpacerItem(leftMargin, 0,
+            QSizePolicy::Fixed, QSizePolicy::Ignored));
    headerHLayout->addWidget(m_headerLabel);
 
    addCategory(new DriversCategory(this));
@@ -570,15 +584,17 @@ ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
    addCategory(new OnscreenDisplayCategory(this));
    addCategory(new UserInterfaceCategory(mainwindow, this));
    addCategory(new AIServiceCategory(this));
+#ifdef HAVE_CHEEVOS
    addCategory(new AchievementsCategory(this));
+#endif
    addCategory(new NetworkCategory(this));
    addCategory(new PlaylistsCategory(this));
    addCategory(new UserCategory(this));
    addCategory(new DirectoryCategory(this));
 
-   width  = 
-        m_optionsList->sizeHintForColumn(0) 
-      + m_optionsList->frameWidth() * 2 
+   width  =
+        m_optionsList->sizeHintForColumn(0)
+      + m_optionsList->frameWidth() * 2
       + 5;
    width += m_optionsList->verticalScrollBar()->sizeHint().width();
 
@@ -591,8 +607,10 @@ ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
    layout->addLayout(headerHLayout, 0, 1);
    layout->addLayout(m_optionsStack, 1, 1);
 
-   connect(m_optionsList, SIGNAL(currentRowChanged(int)), m_optionsStack, SLOT(setCurrentIndex(int)));
-   connect(m_optionsList, SIGNAL(currentTextChanged(const QString&)), m_headerLabel, SLOT(setText(const QString&)));
+   connect(m_optionsList, SIGNAL(currentRowChanged(int)),
+         m_optionsStack, SLOT(setCurrentIndex(int)));
+   connect(m_optionsList, SIGNAL(currentTextChanged(const QString&)),
+         m_headerLabel, SLOT(setText(const QString&)));
 
    connect(this, SIGNAL(rejected()), this, SLOT(onRejected()));
 }
@@ -601,9 +619,9 @@ QIcon getIcon(OptionsCategory *category)
 {
    settings_t *settings        = config_get_ptr();
    const char *path_dir_assets = settings->paths.directory_assets;
-   QPixmap pixmap              = QPixmap(QString(path_dir_assets) 
-         + "/xmb/monochrome/png/" 
-         + category->categoryIconName() 
+   QPixmap pixmap              = QPixmap(QString(path_dir_assets)
+         + "/xmb/monochrome/png/"
+         + category->categoryIconName()
          + ".png");
    return QIcon(getColorizedPixmap(pixmap, getLabelColor("iconColor")));
 }
@@ -651,7 +669,8 @@ ViewOptionsDialog::ViewOptionsDialog(MainWindow *mainwindow, QWidget *parent) :
    , m_viewOptionsWidget(new ViewOptionsWidget(mainwindow))
 {
    QVBoxLayout         *layout = new QVBoxLayout;
-   QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+   QDialogButtonBox *buttonBox = new QDialogButtonBox(
+         QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
    connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
    connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
@@ -684,10 +703,7 @@ void ViewOptionsDialog::showDialog()
    activateWindow();
 }
 
-void ViewOptionsDialog::hideDialog()
-{
-   reject();
-}
+void ViewOptionsDialog::hideDialog() { reject(); }
 
 void ViewOptionsDialog::onRejected()
 {
@@ -711,9 +727,12 @@ ViewOptionsWidget::ViewOptionsWidget(MainWindow *mainwindow, QWidget *parent) :
    ,m_thumbnailCacheSpinBox(new QSpinBox(this))
    ,m_thumbnailDropSizeSpinBox(new QSpinBox(this))
    ,m_startupPlaylistComboBox(new QComboBox(this))
-   ,m_highlightColorPushButton(new QPushButton(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_CHOOSE), this))
+   ,m_highlightColorPushButton(new QPushButton(
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_CHOOSE), this))
    ,m_highlightColor()
-   ,m_highlightColorLabel(new QLabel(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_HIGHLIGHT_COLOR), this))
+   ,m_highlightColorLabel(new QLabel(
+            msg_hash_to_str(
+               MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_HIGHLIGHT_COLOR), this))
    ,m_customThemePath()
    ,m_suggestLoadedCoreFirstCheckBox(new QCheckBox(this))
    /* ,m_allPlaylistsListMaxCountSpinBox(new QSpinBox(this)) */
@@ -722,13 +741,19 @@ ViewOptionsWidget::ViewOptionsWidget(MainWindow *mainwindow, QWidget *parent) :
    QVBoxLayout *layout = new QVBoxLayout;
    QFormLayout *form   = new QFormLayout;
 
-   m_themeComboBox->addItem(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_SYSTEM_DEFAULT), MainWindow::THEME_SYSTEM_DEFAULT);
-   m_themeComboBox->addItem(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_DARK), MainWindow::THEME_DARK);
-   m_themeComboBox->addItem(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_CUSTOM), MainWindow::THEME_CUSTOM);
+   m_themeComboBox->addItem(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_SYSTEM_DEFAULT),
+         MainWindow::THEME_SYSTEM_DEFAULT);
+   m_themeComboBox->addItem(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_DARK),
+         MainWindow::THEME_DARK);
+   m_themeComboBox->addItem(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_THEME_CUSTOM),
+         MainWindow::THEME_CUSTOM);
 
    m_thumbnailCacheSpinBox->setSuffix(" MB");
    m_thumbnailCacheSpinBox->setRange(0, 99999);
-   
+
    m_thumbnailDropSizeSpinBox->setSuffix(" px");
    m_thumbnailDropSizeSpinBox->setRange(0, 99999);
 
@@ -738,9 +763,14 @@ ViewOptionsWidget::ViewOptionsWidget(MainWindow *mainwindow, QWidget *parent) :
    form->setFormAlignment(Qt::AlignCenter);
    form->setLabelAlignment(Qt::AlignCenter);
 
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_GEOMETRY), m_saveGeometryCheckBox);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_DOCK_POSITIONS), m_saveDockPositionsCheckBox);
-   form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_LAST_TAB), m_saveLastTabCheckBox);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_GEOMETRY),
+         m_saveGeometryCheckBox);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_DOCK_POSITIONS),
+         m_saveDockPositionsCheckBox);
+   form->addRow(msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SAVE_LAST_TAB), m_saveLastTabCheckBox);
    form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SHOW_HIDDEN_FILES), m_showHiddenFilesCheckBox);
    form->addRow(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_QT_MENU_VIEW_OPTIONS_SUGGEST_LOADED_CORE_FIRST), m_suggestLoadedCoreFirstCheckBox);
 #if 0
@@ -825,7 +855,7 @@ void ViewOptionsWidget::loadViewOptions()
    int i;
    int themeIndex    = 0;
    int playlistIndex = 0;
-   QColor highlightColor                       = 
+   QColor highlightColor                       =
       m_settings->value("highlight_color",
             QApplication::palette().highlight().color()).value<QColor>();
    QPixmap highlightPixmap(m_highlightColorPushButton->iconSize());
@@ -917,15 +947,8 @@ void ViewOptionsWidget::saveViewOptions()
    m_mainwindow->setThumbnailCacheLimit(m_thumbnailCacheSpinBox->value());
 }
 
-void ViewOptionsWidget::onAccepted()
-{
-   saveViewOptions();
-}
-
-void ViewOptionsWidget::onRejected()
-{
-   loadViewOptions();
-}
+void ViewOptionsWidget::onAccepted() { saveViewOptions(); }
+void ViewOptionsWidget::onRejected() { loadViewOptions(); }
 
 CoreOptionsDialog::CoreOptionsDialog(QWidget *parent) :
    QDialog(parent)
@@ -940,9 +963,7 @@ CoreOptionsDialog::CoreOptionsDialog(QWidget *parent) :
    QTimer::singleShot(0, this, SLOT(clearLayout()));
 }
 
-CoreOptionsDialog::~CoreOptionsDialog()
-{
-}
+CoreOptionsDialog::~CoreOptionsDialog() { }
 
 void CoreOptionsDialog::resizeEvent(QResizeEvent *event)
 {
@@ -1144,9 +1165,9 @@ void CoreOptionsDialog::buildLayout()
 
          for (j = 0; j < opts; j++)
          {
-            QString desc               = 
+            QString desc               =
                core_option_manager_get_desc(coreopts, j, false);
-            QString val                = 
+            QString val                =
                core_option_manager_get_val(coreopts, j);
             QComboBox *combo_box       = NULL;
             QLabel *descLabel          = NULL;
@@ -1193,7 +1214,7 @@ void CoreOptionsDialog::buildLayout()
             }
 
             for (k = 0; k < option->vals->size; k++)
-               combo_box->addItem(option->vals->elems[k].data, option->key);
+               combo_box->addItem(option->vals->elems[k].data, QVariant::fromValue(QString(option->key)));
 
             combo_box->setCurrentText(val);
             combo_box->setProperty("default_index",
@@ -1481,7 +1502,7 @@ void ShaderParamsDialog::onFilterComboBoxIndexChanged(int)
    if (!ok)
       return;
 
-   if (     menu_shader 
+   if (     menu_shader
          && (pass >= 0)
          && (pass < static_cast<int>(menu_shader->passes)))
    {
@@ -1722,6 +1743,7 @@ void ShaderParamsDialog::onShaderLoadPresetClicked()
 {
    QString path, filter;
    QByteArray pathArray;
+   gfx_ctx_flags_t flags;
    struct video_shader *menu_shader  = NULL;
    struct video_shader *video_shader = NULL;
    const char *pathData              = NULL;
@@ -1731,7 +1753,6 @@ void ShaderParamsDialog::onShaderLoadPresetClicked()
    const char *shader_preset_dir     = settings->paths.directory_video_shader;
 #else
    const char *shader_preset_dir     = NULL;
-
    menu_driver_get_last_shader_preset_path(&shader_preset_dir, NULL);
 #endif
 
@@ -1742,23 +1763,26 @@ void ShaderParamsDialog::onShaderLoadPresetClicked()
 
    filter.append("Shader Preset (");
 
-   /* NOTE: Maybe we should have a way to get a list 
+   flags.flags     = 0;
+   video_context_driver_get_flags(&flags);
+
+   /* NOTE: Maybe we should have a way to get a list
     * of all shader types instead of hard-coding this? */
-   if (video_shader_is_supported(RARCH_SHADER_CG))
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_CG))
    {
-      filter.append(QLatin1Literal(" *"));
+      filter.append(QLatin1String(" *"));
       filter.append(".cgp");
    }
 
-   if (video_shader_is_supported(RARCH_SHADER_GLSL))
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_GLSL))
    {
-      filter.append(QLatin1Literal(" *"));
+      filter.append(QLatin1String(" *"));
       filter.append(".glslp");
    }
 
-   if (video_shader_is_supported(RARCH_SHADER_SLANG))
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_SLANG))
    {
-      filter.append(QLatin1Literal(" *"));
+      filter.append(QLatin1String(" *"));
       filter.append(".slangp");
    }
 
@@ -1879,6 +1903,7 @@ void ShaderParamsDialog::onShaderResetAllPasses()
 
 void ShaderParamsDialog::onShaderAddPassClicked()
 {
+   gfx_ctx_flags_t flags;
    QString path, filter;
    QByteArray pathArray;
    struct video_shader *menu_shader      = NULL;
@@ -1901,16 +1926,17 @@ void ShaderParamsDialog::onShaderAddPassClicked()
 
    filter.append("Shader (");
 
-   /* NOTE: Maybe we should have a way to get a list 
+   flags.flags     = 0;
+   video_context_driver_get_flags(&flags);
+
+   /* NOTE: Maybe we should have a way to get a list
     * of all shader types instead of hard-coding this? */
-   if (video_shader_is_supported(RARCH_SHADER_CG))
-      filter.append(QLatin1Literal(" *.cg"));
-
-   if (video_shader_is_supported(RARCH_SHADER_GLSL))
-      filter.append(QLatin1Literal(" *.glsl"));
-
-   if (video_shader_is_supported(RARCH_SHADER_SLANG))
-      filter.append(QLatin1Literal(" *.slang"));
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_CG))
+      filter.append(QLatin1String(" *.cg"));
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_GLSL))
+      filter.append(QLatin1String(" *.glsl"));
+   if (BIT32_GET(flags.flags, GFX_CTX_FLAGS_SHADERS_SLANG))
+      filter.append(QLatin1String(" *.slang"));
 
    filter.append(")");
 
@@ -2020,19 +2046,17 @@ void ShaderParamsDialog::operateShaderPreset(bool save, const char *path, unsign
                true);
 
       if (ret)
-         runloop_msg_queue_push(
-               msg_hash_to_str(MSG_SHADER_PRESET_SAVED_SUCCESSFULLY),
-               1, 100, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT,
-               MESSAGE_QUEUE_CATEGORY_INFO
-               );
+      {
+         const char *_msg = msg_hash_to_str(MSG_SHADER_PRESET_SAVED_SUCCESSFULLY);
+         runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+      }
       else
-         runloop_msg_queue_push(
-               msg_hash_to_str(MSG_ERROR_SAVING_SHADER_PRESET),
-               1, 100, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT,
-               MESSAGE_QUEUE_CATEGORY_ERROR
-               );
+      {
+         const char *_msg = msg_hash_to_str(MSG_ERROR_SAVING_SHADER_PRESET);
+         runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+      }
    }
    else
    {
@@ -2041,24 +2065,20 @@ void ShaderParamsDialog::operateShaderPreset(bool save, const char *path, unsign
                path_dir_video_shader,
                path_dir_menu_config))
       {
-         runloop_msg_queue_push(
-               msg_hash_to_str(MSG_SHADER_PRESET_REMOVED_SUCCESSFULLY),
-               1, 100, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT,
-               MESSAGE_QUEUE_CATEGORY_INFO
-               );
+         const char *_msg = msg_hash_to_str(MSG_SHADER_PRESET_REMOVED_SUCCESSFULLY);
+         runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
 #ifdef HAVE_MENU
          menu_state_get_ptr()->flags |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
 #endif
       }
       else
-         runloop_msg_queue_push(
-               msg_hash_to_str(MSG_ERROR_REMOVING_SHADER_PRESET),
-               1, 100, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT,
-               MESSAGE_QUEUE_CATEGORY_ERROR
-               );
+      {
+         const char *_msg = msg_hash_to_str(MSG_ERROR_REMOVING_SHADER_PRESET);
+         runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+      }
    }
 }
 
@@ -2181,28 +2201,28 @@ void ShaderParamsDialog::updateRemovePresetButtonsState()
             menu_shader_manager_auto_preset_exists(
                SHADER_PRESET_GLOBAL,
                path_dir_video_shader,
-               path_dir_menu_config 
+               path_dir_menu_config
                ));
    if (removeCorePresetAction)
       removeCorePresetAction->setEnabled(
             menu_shader_manager_auto_preset_exists(
                SHADER_PRESET_CORE,
                path_dir_video_shader,
-               path_dir_menu_config 
+               path_dir_menu_config
                ));
    if (removeParentPresetAction)
       removeParentPresetAction->setEnabled(
             menu_shader_manager_auto_preset_exists(
                SHADER_PRESET_PARENT,
                path_dir_video_shader,
-               path_dir_menu_config 
+               path_dir_menu_config
                ));
    if (removeGamePresetAction)
       removeGamePresetAction->setEnabled(
             menu_shader_manager_auto_preset_exists(
                SHADER_PRESET_GAME,
                path_dir_video_shader,
-               path_dir_menu_config 
+               path_dir_menu_config
                ));
 }
 
@@ -2235,14 +2255,14 @@ void ShaderParamsDialog::buildLayout()
 
    getShaders(&menu_shader, &video_shader);
 
-   /* NOTE: For some reason, menu_shader_get() returns a COPY 
+   /* NOTE: For some reason, menu_shader_get() returns a COPY
     * of what get_current_shader() gives us.
-    * And if you want to be able to change shader settings/parameters 
+    * And if you want to be able to change shader settings/parameters
     * from both the raster menu and
-    * Qt at the same time... you must change BOTH or one will 
+    * Qt at the same time... you must change BOTH or one will
     * overwrite the other.
     *
-    * AND, during a context reset, video_shader will be NULL 
+    * AND, during a context reset, video_shader will be NULL
     * but not menu_shader, so don't totally bail
     * just because video_shader is NULL.
     *
@@ -2256,7 +2276,7 @@ void ShaderParamsDialog::buildLayout()
       if (video_shader->passes == 0)
          setWindowTitle(msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SHADER_OPTIONS));
    }
-   /* Normally we'd only use video_shader, 
+   /* Normally we'd only use video_shader,
     * but the Vulkan driver returns a NULL shader when there
     * are zero passes, so just fall back to menu_shader.
     */
@@ -2278,7 +2298,7 @@ void ShaderParamsDialog::buildLayout()
 
    clearLayout();
 
-   /* Only check video_shader for the path, menu_shader seems stale... 
+   /* Only check video_shader for the path, menu_shader seems stale...
     * e.g. if you remove all the shader passes,
     * it still has the old path in it, but video_shader does not
     */

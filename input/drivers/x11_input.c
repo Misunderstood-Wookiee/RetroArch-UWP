@@ -24,27 +24,50 @@
 #include <compat/strl.h>
 #include <retro_inline.h>
 
+#ifdef HAVE_XI2
+#include <X11/extensions/XInput2.h>
+#define MAX_MOUSE_IDX MAX_INPUT_DEVICES
+#else
+#define MAX_MOUSE_IDX 1
+#endif
+
 #include "../input_keymaps.h"
+#include "../input_defines.h"
 
 #include "../common/input_x11_common.h"
+#include "../common/linux_common.h"
 
 #include "../../configuration.h"
 #include "../../retroarch.h"
+#include "../../verbosity.h"
 
 typedef struct x11_input
 {
    Display *display;
    Window win;
 
-   int mouse_x;
-   int mouse_y;
-   int mouse_delta_x;
-   int mouse_delta_y;
+#ifdef HAVE_XI2
+   int mouse_dev_list[MAX_MOUSE_IDX];
+#endif
+   int mouse_x[MAX_MOUSE_IDX];
+   int mouse_y[MAX_MOUSE_IDX];
+   int mouse_delta_x[MAX_MOUSE_IDX];
+   int mouse_delta_y[MAX_MOUSE_IDX];
    bool mouse_grabbed;
    char state[32];
-   bool mouse_l;
-   bool mouse_r;
-   bool mouse_m;
+   bool mouse_l[MAX_MOUSE_IDX];
+   bool mouse_r[MAX_MOUSE_IDX];
+   bool mouse_m[MAX_MOUSE_IDX];
+#ifdef HAVE_XI2
+   bool mouse_4[MAX_MOUSE_IDX];
+   bool mouse_5[MAX_MOUSE_IDX];
+   XIDeviceInfo *di;
+#endif
+
+#ifdef __linux__
+   /* X11 is mostly used on Linux, but not exclusively. */
+   linux_illuminance_sensor_t *illuminance_sensor;
+#endif
 } x11_input_t;
 
 /* Public global variable */
@@ -53,6 +76,12 @@ extern bool g_x11_entered;
 static void *x_input_init(const char *joypad_driver)
 {
    x11_input_t *x11;
+#ifdef HAVE_XI2
+   XIDeviceInfo *dev;
+   XIButtonClassInfo *classinfo;
+   int i, j = 0;
+   int cnt;
+#endif
 
    /* Currently active window is not an X11 window. Cannot use this driver. */
    if (video_driver_display_type_get() != RARCH_DISPLAY_X11)
@@ -66,6 +95,23 @@ static void *x_input_init(const char *joypad_driver)
 
    input_keymaps_init_keyboard_lut(rarch_key_map_x11);
 
+#ifdef HAVE_XI2
+   x11->di = XIQueryDevice(x11->display, XIAllDevices, &cnt);
+   for (i = 0; i < cnt; i++)
+   {
+      x11->mouse_dev_list[i] = -1;
+      dev = &(x11->di[i]);
+      RARCH_DBG("[X11]: Device detected, %d \"%s\" attached to %d\n", i, dev->name, dev->attachment);
+      if (dev->use == XIMasterPointer)
+      {
+         RARCH_LOG("[X11]: Master pointer, %d \"%s\"\n",dev->deviceid,dev->name);
+         input_config_set_mouse_display_name(j, dev->name);
+         x11->mouse_dev_list[j++] = dev->deviceid;
+      }
+   }
+#else
+   RARCH_DBG("[X11]: XInput2 support not compiled in, using only 1 mouse.\n");
+#endif
    return x11;
 }
 
@@ -78,19 +124,26 @@ static bool x_keyboard_pressed(x11_input_t *x11, unsigned key)
 static bool x_mouse_button_pressed(
       x11_input_t *x11, unsigned port, unsigned key)
 {
+   unsigned mouse_port = port;
+#ifndef HAVE_XI2
+   mouse_port = 0;
+#endif
+
    switch (key)
    {
       case RETRO_DEVICE_ID_MOUSE_LEFT:
-         return x11->mouse_l;
+         return x11->mouse_l[mouse_port];
       case RETRO_DEVICE_ID_MOUSE_RIGHT:
-         return x11->mouse_r;
+         return x11->mouse_r[mouse_port];
       case RETRO_DEVICE_ID_MOUSE_MIDDLE:
-         return x11->mouse_m;
-#if 0
+         return x11->mouse_m[mouse_port];
       case RETRO_DEVICE_ID_MOUSE_BUTTON_4:
-         return x11->mouse_b4;
+#ifdef HAVE_XI2
+         return x11->mouse_4[mouse_port];
+#endif
       case RETRO_DEVICE_ID_MOUSE_BUTTON_5:
-         return x11->mouse_b5;
+#ifdef HAVE_XI2
+         return x11->mouse_5[mouse_port];
 #endif
       case RETRO_DEVICE_ID_MOUSE_WHEELUP:
       case RETRO_DEVICE_ID_MOUSE_WHEELDOWN:
@@ -100,41 +153,6 @@ static bool x_mouse_button_pressed(
    }
 
    return false;
-}
-
-static unsigned x_retro_id_to_rarch(unsigned id)
-{
-   switch (id)
-   {
-      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_RIGHT:
-         return RARCH_LIGHTGUN_DPAD_RIGHT;
-      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_LEFT:
-         return RARCH_LIGHTGUN_DPAD_LEFT;
-      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_UP:
-         return RARCH_LIGHTGUN_DPAD_UP;
-      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_DOWN:
-         return RARCH_LIGHTGUN_DPAD_DOWN;
-      case RETRO_DEVICE_ID_LIGHTGUN_SELECT:
-         return RARCH_LIGHTGUN_SELECT;
-      case RETRO_DEVICE_ID_LIGHTGUN_PAUSE:
-         return RARCH_LIGHTGUN_START;
-      case RETRO_DEVICE_ID_LIGHTGUN_RELOAD:
-         return RARCH_LIGHTGUN_RELOAD;
-      case RETRO_DEVICE_ID_LIGHTGUN_TRIGGER:
-         return RARCH_LIGHTGUN_TRIGGER;
-      case RETRO_DEVICE_ID_LIGHTGUN_AUX_A:
-         return RARCH_LIGHTGUN_AUX_A;
-      case RETRO_DEVICE_ID_LIGHTGUN_AUX_B:
-         return RARCH_LIGHTGUN_AUX_B;
-      case RETRO_DEVICE_ID_LIGHTGUN_AUX_C:
-         return RARCH_LIGHTGUN_AUX_C;
-      case RETRO_DEVICE_ID_LIGHTGUN_START:
-         return RARCH_LIGHTGUN_START;
-      default:
-         break;
-   }
-
-   return 0;
 }
 
 static int16_t x_input_state(
@@ -152,6 +170,11 @@ static int16_t x_input_state(
 
    if (port < MAX_USERS)
    {
+      unsigned mouse_port = port;
+      
+#ifndef HAVE_XI2
+      mouse_port = 0;
+#endif
       x11_input_t *x11     = (x11_input_t*)data;
       settings_t *settings = config_get_ptr();
 
@@ -209,7 +232,7 @@ static int16_t x_input_state(
             }
             break;
          case RETRO_DEVICE_ANALOG:
-            if (binds[port])
+            if (binds)
             {
                int id_minus_key      = 0;
                int id_plus_key       = 0;
@@ -252,46 +275,39 @@ static int16_t x_input_state(
             {
                case RETRO_DEVICE_ID_MOUSE_X:
                   if (device == RARCH_DEVICE_MOUSE_SCREEN)
-                     return x11->mouse_x;
-                  return x11->mouse_delta_x;
+                     return x11->mouse_x[mouse_port];
+                  return x11->mouse_delta_x[mouse_port];
                case RETRO_DEVICE_ID_MOUSE_Y:
                   if (device == RARCH_DEVICE_MOUSE_SCREEN)
-                     return x11->mouse_y;
-                  return x11->mouse_delta_y;
+                     return x11->mouse_y[mouse_port];
+                  return x11->mouse_delta_y[mouse_port];
                case RETRO_DEVICE_ID_MOUSE_LEFT:
-                  return x11->mouse_l;
                case RETRO_DEVICE_ID_MOUSE_RIGHT:
-                  return x11->mouse_r;
                case RETRO_DEVICE_ID_MOUSE_WHEELUP:
                case RETRO_DEVICE_ID_MOUSE_WHEELDOWN:
                case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELUP:
                case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELDOWN:
-                  return x_mouse_state_wheel(id);
+               case RETRO_DEVICE_ID_MOUSE_BUTTON_4:
+               case RETRO_DEVICE_ID_MOUSE_BUTTON_5:
                case RETRO_DEVICE_ID_MOUSE_MIDDLE:
-                  return x11->mouse_m;
+                  return x_mouse_button_pressed(x11, mouse_port, id);
             }
             break;
          case RETRO_DEVICE_POINTER:
          case RARCH_DEVICE_POINTER_SCREEN:
-            if (idx == 0)
+            /* Map up to 3 touches to mouse buttons. */
+            if (idx < 3)
             {
-               struct video_viewport vp;
-               bool screen                 = device == RARCH_DEVICE_POINTER_SCREEN;
-               bool inside                 = false;
+               struct video_viewport vp    = {0};
+               bool screen                 =
+                  (device == RARCH_DEVICE_POINTER_SCREEN);
                int16_t res_x               = 0;
                int16_t res_y               = 0;
                int16_t res_screen_x        = 0;
                int16_t res_screen_y        = 0;
 
-               vp.x                        = 0;
-               vp.y                        = 0;
-               vp.width                    = 0;
-               vp.height                   = 0;
-               vp.full_width               = 0;
-               vp.full_height              = 0;
-
-               if (video_driver_translate_coord_viewport_wrap(
-                        &vp, x11->mouse_x, x11->mouse_y,
+               if (video_driver_translate_coord_viewport_confined_wrap(
+                        &vp, x11->mouse_x[mouse_port], x11->mouse_y[mouse_port],
                         &res_x, &res_y, &res_screen_x, &res_screen_y))
                {
                   if (screen)
@@ -300,11 +316,6 @@ static int16_t x_input_state(
                      res_y = res_screen_y;
                   }
 
-                  inside = (res_x >= -0x7fff) && (res_y >= -0x7fff);
-
-                  if (!inside)
-                     return 0;
-
                   switch (id)
                   {
                      case RETRO_DEVICE_ID_POINTER_X:
@@ -312,7 +323,17 @@ static int16_t x_input_state(
                      case RETRO_DEVICE_ID_POINTER_Y:
                         return res_y;
                      case RETRO_DEVICE_ID_POINTER_PRESSED:
-                        return x11->mouse_l;
+                        if (idx == 0)
+                           return (x11->mouse_l[mouse_port]
+                                 | x11->mouse_r[mouse_port]
+                                 | x11->mouse_m[mouse_port]);
+                        else if (idx == 1)
+                           return (x11->mouse_r[mouse_port]
+                                 | x11->mouse_m[mouse_port]);
+                        else if (idx == 2)
+                           return x11->mouse_m[mouse_port];
+                     case RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN:
+                        return input_driver_pointer_is_offscreen(res_x, res_y);
                   }
                }
             }
@@ -325,42 +346,24 @@ static int16_t x_input_state(
                case RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y:
                case RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN:
                   {
-                     struct video_viewport vp;
-                     const int edge_detect       = 32700;
-                     bool inside                 = false;
+                     struct video_viewport vp    = {0};
                      int16_t res_x               = 0;
                      int16_t res_y               = 0;
                      int16_t res_screen_x        = 0;
                      int16_t res_screen_y        = 0;
 
-                     vp.x                        = 0;
-                     vp.y                        = 0;
-                     vp.width                    = 0;
-                     vp.height                   = 0;
-                     vp.full_width               = 0;
-                     vp.full_height              = 0;
-
                      if (video_driver_translate_coord_viewport_wrap(&vp,
-                              x11->mouse_x, x11->mouse_y,
+                              x11->mouse_x[mouse_port], x11->mouse_y[mouse_port],
                               &res_x, &res_y, &res_screen_x, &res_screen_y))
                      {
-                        inside =    (res_x >= -edge_detect) 
-                           && (res_y >= -edge_detect)
-                           && (res_x <= edge_detect)
-                           && (res_y <= edge_detect);
-
                         switch ( id )
                         {
                            case RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X:
-                              if (inside)
-                                 return res_x;
-                              break;
+                              return res_x;
                            case RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y:
-                              if (inside)
-                                 return res_y;
-                              break;
+                              return res_y;
                            case RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN:
-                              return !inside;
+                              return input_driver_pointer_is_offscreen(res_x, res_y);
                            default:
                               break;
                         }
@@ -381,7 +384,7 @@ static int16_t x_input_state(
                case RETRO_DEVICE_ID_LIGHTGUN_DPAD_RIGHT:
                case RETRO_DEVICE_ID_LIGHTGUN_PAUSE: /* deprecated */
                   {
-                     unsigned new_id                = x_retro_id_to_rarch(id);
+                     unsigned new_id                = input_driver_lightgun_id_convert(id);
                      const uint64_t bind_joykey     = input_config_binds[port][new_id].joykey;
                      const uint64_t bind_joyaxis    = input_config_binds[port][new_id].joyaxis;
                      const uint64_t autobind_joykey = input_autoconf_binds[port][new_id].joykey;
@@ -399,27 +402,24 @@ static int16_t x_input_state(
                                  joyport, (uint16_t)joykey))
                            return 1;
                         if (joyaxis != AXIS_NONE &&
-                              ((float)abs(joypad->axis(joyport, joyaxis)) 
+                              ((float)abs(joypad->axis(joyport, joyaxis))
                                / 0x8000) > axis_threshold)
                            return 1;
-                        else if ((binds[port][new_id].key && binds[port][new_id].key < RETROK_LAST) 
+                        else if ((binds[port][new_id].key && binds[port][new_id].key < RETROK_LAST)
                               && !keyboard_mapping_blocked
                               && x_keyboard_pressed(x11, binds[port][new_id].key)
                            )
                            return 1;
-                        else if (settings->uints.input_mouse_index[port] == 0)
-                        {
-                           if (x_mouse_button_pressed(x11, port, binds[port][new_id].mbutton))
+                        else if (x_mouse_button_pressed(x11, port, binds[port][new_id].mbutton))
                               return 1;
-                        }
                      }
                   }
                   break;
                   /*deprecated*/
                case RETRO_DEVICE_ID_LIGHTGUN_X:
-                  return x11->mouse_delta_x;
+                  return x11->mouse_delta_x[mouse_port];
                case RETRO_DEVICE_ID_LIGHTGUN_Y:
-                  return x11->mouse_delta_y;
+                  return x11->mouse_delta_y[mouse_port];
             }
             break;
       }
@@ -433,7 +433,73 @@ static void x_input_free(void *data)
    x11_input_t *x11 = (x11_input_t*)data;
 
    if (x11)
+   {
+#ifdef HAVE_XI2
+      XIFreeDeviceInfo(x11->di);
+#endif
+#ifdef __linux__
+      linux_close_illuminance_sensor(x11->illuminance_sensor);
+#endif
       free(x11);
+   }
+}
+
+static bool x_set_sensor_state(void *data, unsigned port, enum retro_sensor_action action, unsigned rate)
+{
+   x11_input_t *x11 = (x11_input_t*)data;
+
+   if (!x11)
+      return false;
+
+   switch (action)
+   {
+      case RETRO_SENSOR_ILLUMINANCE_DISABLE:
+         /* If already disabled, then do nothing */
+#ifdef __linux__
+         linux_close_illuminance_sensor(x11->illuminance_sensor); /* noop if NULL */
+         x11->illuminance_sensor = NULL;
+#endif
+      case RETRO_SENSOR_GYROSCOPE_DISABLE:
+      case RETRO_SENSOR_ACCELEROMETER_DISABLE:
+         /** Unimplemented sensor actions that probably shouldn't fail */
+         return true;
+
+#ifdef __linux__
+      case RETRO_SENSOR_ILLUMINANCE_ENABLE:
+         if (x11->illuminance_sensor)
+           /* If we already have a sensor, just set the rate */
+           linux_set_illuminance_sensor_rate(x11->illuminance_sensor, rate);
+         else
+           x11->illuminance_sensor = linux_open_illuminance_sensor(rate);
+
+         return x11->illuminance_sensor != NULL;
+#endif
+      default:
+         break;
+   }
+
+   return false;
+}
+
+static float x_get_sensor_input(void *data, unsigned port, unsigned id)
+{
+   x11_input_t *x11 = (x11_input_t*)data;
+
+   if (!x11)
+      return 0.0f;
+
+   switch (id)
+   {
+#ifdef __linux__
+      case RETRO_SENSOR_ILLUMINANCE:
+         if (x11->illuminance_sensor)
+            return linux_get_illuminance_reading(x11->illuminance_sensor);
+#endif
+      default:
+         break;
+   }
+
+   return 0.0f;
 }
 
 static void x_input_poll(void *data)
@@ -442,22 +508,39 @@ static void x_input_poll(void *data)
    Window child_win;
    x11_input_t *x11         = (x11_input_t*)data;
    bool video_has_focus     = video_driver_has_focus();
+#ifdef HAVE_XI2
+   double root_x            = 0;
+   double root_y            = 0;
+   double win_x             = 0;
+   double win_y             = 0;
+   XIButtonState buttons_return;
+   XIModifierState modifiers_return;
+   XIGroupState group_return;
+   settings_t *settings = config_get_ptr();
+   unsigned mouse_dev_idx;
+#else
    int root_x               = 0;
    int root_y               = 0;
    int win_x                = 0;
    int win_y                = 0;
    unsigned mask            = 0;
+#endif
+   unsigned mouse_port;
 
    /* If window loses focus, 'reset' keyboard
     * and ignore mouse input */
    if (!video_has_focus)
    {
-      memset(x11->state, 0, sizeof(x11->state));
-      x11->mouse_delta_x    = 0;
-      x11->mouse_delta_y    = 0;
-      x11->mouse_l          = 0;
-      x11->mouse_m          = 0;
-      x11->mouse_r          = 0;
+      memset(x11->state,         0, sizeof(x11->state));
+      memset(x11->mouse_delta_x, 0, sizeof(x11->mouse_delta_x));
+      memset(x11->mouse_delta_y, 0, sizeof(x11->mouse_delta_y));
+      memset(x11->mouse_l,       0, sizeof(x11->mouse_l));
+      memset(x11->mouse_m,       0, sizeof(x11->mouse_m));
+      memset(x11->mouse_r,       0, sizeof(x11->mouse_r));
+#ifdef HAVE_XI2
+      memset(x11->mouse_4,       0, sizeof(x11->mouse_4));
+      memset(x11->mouse_5,       0, sizeof(x11->mouse_5));
+#endif
       return;
    }
 
@@ -468,116 +551,149 @@ static void x_input_poll(void *data)
     * window, ignore mouse input */
    if (!g_x11_entered)
    {
-      x11->mouse_delta_x    = 0;
-      x11->mouse_delta_y    = 0;
-      x11->mouse_l          = 0;
-      x11->mouse_m          = 0;
-      x11->mouse_r          = 0;
+      memset(x11->mouse_delta_x, 0, sizeof(x11->mouse_delta_x));
+      memset(x11->mouse_delta_y, 0, sizeof(x11->mouse_delta_y));
+      memset(x11->mouse_l,       0, sizeof(x11->mouse_l));
+      memset(x11->mouse_m,       0, sizeof(x11->mouse_m));
+      memset(x11->mouse_r,       0, sizeof(x11->mouse_r));
+#ifdef HAVE_XI2
+      memset(x11->mouse_4,       0, sizeof(x11->mouse_4));
+      memset(x11->mouse_5,       0, sizeof(x11->mouse_5));
+#endif
       return;
    }
 
-   /* Process mouse */
-   if (!XQueryPointer(x11->display,
-         x11->win,
-         &root_win, &child_win,
-         &root_x, &root_y,
-         &win_x, &win_y,
-         &mask))
-      return;
-
-   /* > Mouse buttons */
-   x11->mouse_l             = mask & Button1Mask;
-   x11->mouse_m             = mask & Button2Mask;
-   x11->mouse_r             = mask & Button3Mask;
-
-   /* > Mouse pointer */
-   if (!x11->mouse_grabbed)
+   for(mouse_port = 0; mouse_port < MAX_MOUSE_IDX; mouse_port++)
    {
-      /* Mouse is not grabbed - this corresponds
-       * to 'conventional' pointer input, using
-       * absolute screen coordinates */
-      int mouse_last_x      = x11->mouse_x;
-      int mouse_last_y      = x11->mouse_y;
-
-      x11->mouse_x          = win_x;
-      x11->mouse_y          = win_y;
-
-      x11->mouse_delta_x    = x11->mouse_x - mouse_last_x;
-      x11->mouse_delta_y    = x11->mouse_y - mouse_last_y;
-   }
-   else
-   {
-      /* Mouse is grabbed - all pointer movement
-       * must be considered 'relative' */
-      XWindowAttributes win_attr;
-      int centre_x, centre_y;
-      int warp_x            = win_x;
-      int warp_y            = win_y;
-      bool do_warp          = false;
-
-      /* Get dimensions/centre coordinates of
-       * application window */
-      if (!XGetWindowAttributes(x11->display, x11->win, &win_attr))
-      {
-         x11->mouse_delta_x = 0;
-         x11->mouse_delta_y = 0;
+#ifdef HAVE_XI2
+      mouse_dev_idx = settings->uints.input_mouse_index[mouse_port];
+      if (mouse_dev_idx >= MAX_INPUT_DEVICES || x11->mouse_dev_list[mouse_dev_idx] < 0)
          return;
-      }
 
-      centre_x              = win_attr.width  >> 1;
-      centre_y              = win_attr.height >> 1;
+      /* Process mouse */
+      if (!XIQueryPointer( x11->display,
+                     x11->mouse_dev_list[mouse_dev_idx],
+                     x11->win,
+                     &root_win, &child_win,
+                     &root_x, &root_y,
+                     &win_x, &win_y,
+                     &buttons_return,
+                     &modifiers_return,
+                     &group_return))
+         return;
+#else
+      if (!XQueryPointer(x11->display,
+            x11->win,
+            &root_win, &child_win,
+            &root_x, &root_y,
+            &win_x, &win_y,
+            &mask))
+         return;
+#endif
 
-      /* Get relative movement delta since last
-       * poll event */
-      x11->mouse_delta_x    = win_x - centre_x;
-      x11->mouse_delta_y    = win_y - centre_y;
+#ifdef HAVE_XI2
+      /* > Mouse buttons - fixed map (1,2,3,8,9) */
+      x11->mouse_l[mouse_port] = buttons_return.mask_len > 0 ? buttons_return.mask[0] & 1<<1 : 0;
+      x11->mouse_m[mouse_port] = buttons_return.mask_len > 0 ? buttons_return.mask[0] & 1<<2 : 0;
+      x11->mouse_r[mouse_port] = buttons_return.mask_len > 0 ? buttons_return.mask[0] & 1<<3 : 0;
+      x11->mouse_4[mouse_port] = buttons_return.mask_len > 1 ? buttons_return.mask[1] & 1<<0 : 0;
+      x11->mouse_5[mouse_port] = buttons_return.mask_len > 1 ? buttons_return.mask[1] & 1<<1 : 0;
+#else
+      x11->mouse_l[mouse_port] = mask & Button1Mask;
+      x11->mouse_m[mouse_port] = mask & Button2Mask;
+      x11->mouse_r[mouse_port] = mask & Button3Mask;
+      /* Buttons 4 and 5 are not returned here, so they are handled elsewhere. */
+#endif
 
-      /* Get effective 'absolute' pointer location
-       * (last position + delta, bounded by current
-       * application window dimensions) */
-      x11->mouse_x         += x11->mouse_delta_x;
-      x11->mouse_y         += x11->mouse_delta_y;
-
-      /* Clamp X */
-      if (x11->mouse_x < 0) 
-         x11->mouse_x       = 0;
-      if (x11->mouse_x >= win_attr.width)
-      x11->mouse_x          = (win_attr.width - 1);
-
-      /* Clamp Y */
-      if (x11->mouse_y < 0) 
-         x11->mouse_y       = 0;
-      if (x11->mouse_y >= win_attr.height)
-         x11->mouse_y       = (win_attr.height - 1);
-
-      /* Hack/workaround:
-       * - X11 gives absolute pointer coordinates
-       * - Once the pointer reaches a screen edge
-       *   it cannot go any further
-       * - To achieve 'relative' motion, we therefore
-       *   have to reset the hardware cursor to the
-       *   centre of the screen after polling each
-       *   movement delta, such that it is always
-       *   free to move in all directions during the
-       *   time interval until the next poll event */
-      if (win_x != centre_x)
+      /* > Mouse pointer */
+      if (!x11->mouse_grabbed)
       {
-         warp_x  = centre_x;
-         do_warp = true;
-      }
+         /* Mouse is not grabbed - this corresponds
+          * to 'conventional' pointer input, using
+          * absolute screen coordinates */
+      int mouse_last_x               = x11->mouse_x[mouse_port];
+      int mouse_last_y               = x11->mouse_y[mouse_port];
 
-      if (win_y != centre_y)
-      {
-         warp_y  = centre_y;
-         do_warp = true;
-      }
+      x11->mouse_x[mouse_port]       = win_x;
+      x11->mouse_y[mouse_port]       = win_y;
 
-      if (do_warp)
+      x11->mouse_delta_x[mouse_port] = x11->mouse_x[mouse_port] - mouse_last_x;
+      x11->mouse_delta_y[mouse_port] = x11->mouse_y[mouse_port] - mouse_last_y;
+      }
+      else
       {
-         XWarpPointer(x11->display, None,
-               x11->win, 0, 0, 0, 0,
-               warp_x, warp_y);
-         XSync(x11->display, False);
+         /* Mouse is grabbed - all pointer movement
+          * must be considered 'relative' */
+         XWindowAttributes win_attr;
+         int centre_x, centre_y;
+         int warp_x            = win_x;
+         int warp_y            = win_y;
+         bool do_warp          = false;
+
+         /* Get dimensions/centre coordinates of
+          * application window */
+         if (!XGetWindowAttributes(x11->display, x11->win, &win_attr))
+         {
+            x11->mouse_delta_x[mouse_port] = 0;
+            x11->mouse_delta_y[mouse_port] = 0;
+            return;
+         }
+
+         centre_x              = win_attr.width  >> 1;
+         centre_y              = win_attr.height >> 1;
+
+         /* Get relative movement delta since last
+          * poll event */
+         x11->mouse_delta_x[mouse_port] = win_x - centre_x;
+         x11->mouse_delta_y[mouse_port] = win_y - centre_y;
+
+         /* Get effective 'absolute' pointer location
+          * (last position + delta, bounded by current
+          * application window dimensions) */
+         x11->mouse_x[mouse_port]     += x11->mouse_delta_x[mouse_port];
+         x11->mouse_y[mouse_port]     += x11->mouse_delta_y[mouse_port];
+
+         /* Clamp X */
+         if (x11->mouse_x[mouse_port] < 0)
+            x11->mouse_x[mouse_port] = 0;
+         if (x11->mouse_x[mouse_port] >= win_attr.width)
+            x11->mouse_x[mouse_port] = (win_attr.width - 1);
+
+         /* Clamp Y */
+         if (x11->mouse_y[mouse_port] < 0)
+            x11->mouse_y[mouse_port] = 0;
+         if (x11->mouse_y[mouse_port] >= win_attr.height)
+            x11->mouse_y[mouse_port] = (win_attr.height - 1);
+
+         /* Hack/workaround:
+          * - X11 gives absolute pointer coordinates
+          * - Once the pointer reaches a screen edge
+          *   it cannot go any further
+          * - To achieve 'relative' motion, we therefore
+          *   have to reset the hardware cursor to the
+          *   centre of the screen after polling each
+          *   movement delta, such that it is always
+          *   free to move in all directions during the
+          *   time interval until the next poll event */
+         if (win_x != centre_x)
+         {
+            warp_x  = centre_x;
+            do_warp = true;
+         }
+
+         if (win_y != centre_y)
+         {
+            warp_y  = centre_y;
+            do_warp = true;
+         }
+
+         if (do_warp)
+         {
+            XWarpPointer(x11->display, None,
+                  x11->win, 0, 0, 0, 0,
+                  warp_x, warp_y);
+            XSync(x11->display, False);
+         }
       }
    }
 }
@@ -605,8 +721,14 @@ input_driver_t input_x = {
    x_input_poll,
    x_input_state,
    x_input_free,
+#ifdef __linux__
+   /* Right now this driver only supports the illuminance sensor on Linux. */
+   x_set_sensor_state,
+   x_get_sensor_input,
+#else
    NULL,
    NULL,
+#endif
    x_input_get_capabilities,
    "x",
    x_grab_mouse,

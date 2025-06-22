@@ -26,6 +26,7 @@
 #include <compat/strl.h>
 #include <queues/fifo_queue.h>
 #include <string/stdstring.h>
+#include <retro_miscellaneous.h>
 
 #include "../connect/joypad_connection.h"
 #include "../input_defines.h"
@@ -63,8 +64,8 @@ struct libusb_adapter
    int endpoint_in_max_size;
    int endpoint_out_max_size;
 
-   uint8_t manufacturer_name[255];
-   uint8_t name[255];
+   uint8_t manufacturer_name[NAME_MAX_LENGTH];
+   uint8_t name[NAME_MAX_LENGTH];
    uint8_t data[2048];
 
    int slot;
@@ -88,26 +89,26 @@ static void adapter_thread(void *data)
 
    while (!adapter->quitting)
    {
-      size_t send_command_size;
       int tmp;
+      size_t _len;
       int report_number;
       int size = 0;
 
       slock_lock(adapter->send_control_lock);
       if (FIFO_READ_AVAIL(adapter->send_control_buffer)
-            >= sizeof(send_command_size))
+            >= sizeof(_len))
       {
          fifo_read(adapter->send_control_buffer,
-               &send_command_size, sizeof(send_command_size));
+               &_len, sizeof(_len));
 
          if (FIFO_READ_AVAIL(adapter->send_control_buffer)
-               >= sizeof(send_command_size))
+               >= sizeof(_len))
          {
             fifo_read(adapter->send_control_buffer,
-                  send_command_buf, send_command_size);
+                  send_command_buf, _len);
             libusb_interrupt_transfer(adapter->handle,
                   adapter->endpoint_out, send_command_buf,
-                  send_command_size, &tmp, 1000);
+                  _len, &tmp, 1000);
          }
       }
       slock_unlock(adapter->send_control_lock);
@@ -123,7 +124,7 @@ static void adapter_thread(void *data)
 }
 
 static void libusb_hid_device_send_control(void *data,
-      uint8_t* data_buf, size_t size)
+      uint8_t *s, size_t len)
 {
    struct libusb_adapter *adapter = (struct libusb_adapter*)data;
 
@@ -132,10 +133,10 @@ static void libusb_hid_device_send_control(void *data,
 
    slock_lock(adapter->send_control_lock);
 
-   if (FIFO_WRITE_AVAIL(adapter->send_control_buffer) >= size + sizeof(size))
+   if (FIFO_WRITE_AVAIL(adapter->send_control_buffer) >= len + sizeof(len))
    {
-      fifo_write(adapter->send_control_buffer, &size, sizeof(size));
-      fifo_write(adapter->send_control_buffer, data_buf, size);
+      fifo_write(adapter->send_control_buffer, &len, sizeof(len));
+      fifo_write(adapter->send_control_buffer, s, len);
    }
    else
    {
@@ -523,11 +524,11 @@ static int16_t libusb_hid_joypad_state(
       const uint32_t joyaxis = (binds[i].joyaxis != AXIS_NONE)
          ? binds[i].joyaxis : joypad_info->auto_binds[i].joyaxis;
       if (
-               (uint16_t)joykey != NO_BTN 
+               (uint16_t)joykey != NO_BTN
             && libusb_hid_joypad_button(data, port_idx, (uint16_t)joykey))
          ret |= ( 1 << i);
       else if (joyaxis != AXIS_NONE &&
-            ((float)abs(libusb_hid_joypad_axis(data, port_idx, joyaxis)) 
+            ((float)abs(libusb_hid_joypad_axis(data, port_idx, joyaxis))
              / 0x8000) > joypad_info->axis_threshold)
          ret |= (1 << i);
    }

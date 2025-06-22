@@ -48,7 +48,8 @@ enum menu_state_flags
     * - Does menu driver support screensaver functionality?
     * - Is screensaver currently active? */
    MENU_ST_FLAG_SCREENSAVER_SUPPORTED       = (1 << 10),
-   MENU_ST_FLAG_SCREENSAVER_ACTIVE          = (1 << 11)
+   MENU_ST_FLAG_SCREENSAVER_ACTIVE          = (1 << 11),
+   MENU_ST_FLAG_PENDING_RELOAD_CORE         = (1 << 12)
 };
 
 enum menu_scroll_mode
@@ -165,9 +166,7 @@ enum menu_timedate_date_separator_type
    MENU_TIMEDATE_DATE_SEPARATOR_LAST
 };
 
-/* Specifies location of the 'Scan Content' menu
- * entry when using menu drivers without a
- * dedicated 'Import Content' (horizontal) tab */
+/* Specifies location of the 'Import Content' menu */
 enum menu_add_content_entry_display_type
 {
    MENU_ADD_CONTENT_ENTRY_DISPLAY_HIDDEN = 0,
@@ -316,6 +315,8 @@ enum xmb_color_theme
    XMB_THEME_FLAMING_HOT,
    XMB_THEME_ICE_COLD,
    XMB_THEME_MIDGAR,
+   XMB_THEME_GRAY_DARK,
+   XMB_THEME_GRAY_LIGHT,
    XMB_THEME_LAST
 };
 
@@ -434,7 +435,24 @@ enum ozone_color_theme
    OZONE_COLOR_THEME_GRAY_DARK,
    OZONE_COLOR_THEME_GRAY_LIGHT,
    OZONE_COLOR_THEME_PURPLE_RAIN,
+   OZONE_COLOR_THEME_SELENIUM,
    OZONE_COLOR_THEME_LAST
+};
+
+enum ozone_header_separator
+{
+   OZONE_HEADER_SEPARATOR_NONE = 0,
+   OZONE_HEADER_SEPARATOR_NORMAL,
+   OZONE_HEADER_SEPARATOR_MAXIMUM,
+   OZONE_HEADER_SEPARATOR_LAST
+};
+
+enum ozone_font_scale
+{
+   OZONE_FONT_SCALE_NONE = 0,
+   OZONE_FONT_SCALE_GLOBAL,
+   OZONE_FONT_SCALE_SEPARATE,
+   OZONE_FONT_SCALE_LAST
 };
 
 enum menu_action
@@ -455,7 +473,10 @@ enum menu_action
    MENU_ACTION_SCROLL_UP,
    MENU_ACTION_SCROLL_HOME,
    MENU_ACTION_SCROLL_END,
+   MENU_ACTION_CYCLE_THUMBNAIL_PRIMARY,
+   MENU_ACTION_CYCLE_THUMBNAIL_SECONDARY,
    MENU_ACTION_TOGGLE,
+   MENU_ACTION_RESUME,
    MENU_ACTION_POINTER_MOVED,
    MENU_ACTION_POINTER_PRESSED,
    MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE,
@@ -549,6 +570,19 @@ struct menu_dialog
 };
 
 typedef struct menu_dialog menu_dialog_t;
+
+#ifdef HAVE_RUNAHEAD
+enum menu_runahead_mode
+{
+   MENU_RUNAHEAD_MODE_OFF = 0,
+   MENU_RUNAHEAD_MODE_SINGLE_INSTANCE,
+#if (defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB))
+   MENU_RUNAHEAD_MODE_SECOND_INSTANCE,
+#endif
+   MENU_RUNAHEAD_MODE_PREEMPTIVE_FRAMES,
+   MENU_RUNAHEAD_MODE_LAST
+};
+#endif
 
 RETRO_END_DECLS
 

@@ -15,6 +15,7 @@
  */
 
 #define CINTERFACE
+#define WIN32_LEAN_AND_MEAN
 
 #include <tchar.h>
 
@@ -96,7 +97,7 @@ static void *d3d9x_win32_font_init(void *video_data,
             &desc, (void**)&d3dfonts->font))
       goto error;
 
-   font                   = d3dfonts->font;
+   font                   = (ID3DXFont*)d3dfonts->font;
 
    font->lpVtbl->GetTextMetrics(font, &metrics);
 
@@ -117,7 +118,7 @@ static void d3d9x_win32_font_free(void *data, bool is_threaded)
    if (!d3dfonts)
       return;
 
-   font                 = d3dfonts->font;
+   font                 = (ID3DXFont*)d3dfonts->font;
 
    if (font)
       font->lpVtbl->Release(font);
@@ -135,7 +136,7 @@ static int d3d9x_win32_font_get_message_width(void* data, const char* msg,
    if (!d3dfonts || !msg)
       return 0;
 
-   font                 = d3dfonts->font;
+   font                 = (ID3DXFont*)d3dfonts->font;
 
    font->lpVtbl->DrawText(font, NULL,
          (void*)msg, msg_len ? (INT)msg_len : -1, &box, DT_CALCRECT, 0);
@@ -164,7 +165,7 @@ static void d3d9x_win32_font_render_msg(
    if (!d3dfonts || !msg)
       return;
 
-   font                             = d3dfonts->font;
+   font                             = (ID3DXFont*)d3dfonts->font;
 
    width                            = d3dfonts->d3d->video_info.width;
    height                           = d3dfonts->d3d->video_info.height;
@@ -222,8 +223,6 @@ static void d3d9x_win32_font_render_msg(
    else
    {
       settings_t *settings     = config_get_ptr();
-      float video_msg_pos_x    = settings->floats.video_msg_pos_x;
-      float video_msg_pos_y    = settings->floats.video_msg_pos_y;
       float video_msg_color_r  = settings->floats.video_msg_color_r;
       float video_msg_color_g  = settings->floats.video_msg_color_g;
       float video_msg_color_b  = settings->floats.video_msg_color_b;

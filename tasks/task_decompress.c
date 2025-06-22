@@ -14,7 +14,6 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <lists/string_list.h>
 #include <string/stdstring.h>
 #include <file/file_path.h>
 #include <file/archive_file.h>
@@ -28,12 +27,10 @@
 #define CALLBACK_ERROR_SIZE 4200
 
 static int file_decompressed_target_file(const char *name,
-      const char *valid_exts,
-      const uint8_t *cdata,
+      const char *valid_exts, const uint8_t *cdata,
       unsigned cmode, uint32_t csize, uint32_t size,
       uint32_t crc32, struct archive_extract_userdata *userdata)
 {
-   /* TODO/FIXME */
    return 0;
 }
 
@@ -43,13 +40,11 @@ static int file_decompressed_subdir(const char *name,
       unsigned cmode, uint32_t csize,uint32_t size,
       uint32_t crc32, struct archive_extract_userdata *userdata)
 {
-   size_t _len;
-   char path_dir[PATH_MAX_LENGTH];
+   char path_dir[DIR_MAX_LENGTH];
    char path[PATH_MAX_LENGTH];
-   size_t name_len            = strlen(name);
-   char last_char             = name[name_len - 1];
-   /* Ignore directories, go to next file. */
-   if (last_char == '/' || last_char == '\\')
+   size_t _len        = strlen(name);
+   /* Look at last character. Ignore directories, go to next file. */
+   if (name[_len - 1] == '/' || name[_len - 1] == '\\')
       return 1;
    if (strstr(name, userdata->dec->subdir) != name)
       return 1;
@@ -90,13 +85,11 @@ static int file_decompressed(const char *name, const char *valid_exts,
    const uint8_t *cdata, unsigned cmode, uint32_t csize, uint32_t size,
    uint32_t crc32, struct archive_extract_userdata *userdata)
 {
-   size_t _len;
    char path[PATH_MAX_LENGTH];
-   decompress_state_t    *dec = userdata->dec;
-   size_t name_len            = strlen(name);
-   char last_char             = name[name_len - 1];
-   /* Ignore directories, go to next file. */
-   if (last_char == '/' || last_char == '\\')
+   decompress_state_t *dec = userdata->dec;
+   size_t _len             = strlen(name);
+   /* Look at last character. Ignore directories, go to next file. */
+   if (name[_len - 1] == '/' || name[_len - 1] == '\\')
       return 1;
    /* Make directory */
    fill_pathname_join_special(path, dec->target_dir, name, sizeof(path));
@@ -129,9 +122,11 @@ error:
 static void task_decompress_handler_finished(retro_task_t *task,
       decompress_state_t *dec)
 {
-   task_set_finished(task, true);
+   uint8_t flg;
+   task_set_flags(task, RETRO_TASK_FLG_FINISHED, true);
+   flg = task_get_flags(task);
 
-   if (!task_get_error(task) && task_get_cancelled(task))
+   if (!task_get_error(task) && ((flg & RETRO_TASK_FLG_CANCELLED) > 0))
       task_set_error(task, strdup("Task canceled"));
 
    if (task_get_error(task))
@@ -158,9 +153,9 @@ static void task_decompress_handler_finished(retro_task_t *task,
 static void task_decompress_handler(retro_task_t *task)
 {
    int ret;
-   bool retdec                              = false;
-   decompress_state_t *dec                  = (decompress_state_t*)
-      task->state;
+   uint8_t flg;
+   bool retdec                   = false;
+   decompress_state_t *dec       = (decompress_state_t*)task->state;
 
    dec->userdata->dec            = dec;
    strlcpy(dec->userdata->archive_path,
@@ -174,7 +169,9 @@ static void task_decompress_handler(retro_task_t *task)
    task_set_progress(task,
          file_archive_parse_file_progress(&dec->archive));
 
-   if (task_get_cancelled(task) || ret != 0)
+   flg = task_get_flags(task);
+
+   if (((flg & RETRO_TASK_FLG_CANCELLED) > 0) || ret != 0)
    {
       task_set_error(task, dec->callback_error);
       file_archive_parse_file_iterate_stop(&dec->archive);
@@ -185,10 +182,10 @@ static void task_decompress_handler(retro_task_t *task)
 
 static void task_decompress_handler_target_file(retro_task_t *task)
 {
-   bool retdec;
    int ret;
-   decompress_state_t *dec                  = (decompress_state_t*)
-      task->state;
+   uint8_t flg;
+   bool retdec;
+   decompress_state_t *dec    = (decompress_state_t*)task->state;
 
    strlcpy(dec->userdata->archive_path,
          dec->source_file, sizeof(dec->userdata->archive_path));
@@ -200,7 +197,9 @@ static void task_decompress_handler_target_file(retro_task_t *task)
    task_set_progress(task,
          file_archive_parse_file_progress(&dec->archive));
 
-   if (task_get_cancelled(task) || ret != 0)
+   flg = task_get_flags(task);
+
+   if (((flg & RETRO_TASK_FLG_CANCELLED) > 0) || ret != 0)
    {
       task_set_error(task, dec->callback_error);
       file_archive_parse_file_iterate_stop(&dec->archive);
@@ -212,23 +211,25 @@ static void task_decompress_handler_target_file(retro_task_t *task)
 static void task_decompress_handler_subdir(retro_task_t *task)
 {
    int ret;
+   uint8_t flg;
    bool retdec;
    decompress_state_t *dec = (decompress_state_t*)task->state;
 
-   dec->userdata->dec            = dec;
+   dec->userdata->dec      = dec;
    strlcpy(dec->userdata->archive_path,
          dec->source_file,
          sizeof(dec->userdata->archive_path));
 
    ret                     = file_archive_parse_file_iterate(
-         &dec->archive,
-         &retdec, dec->source_file,
+         &dec->archive, &retdec, dec->source_file,
          dec->valid_ext, file_decompressed_subdir, dec->userdata);
 
    task_set_progress(task,
          file_archive_parse_file_progress(&dec->archive));
 
-   if (task_get_cancelled(task) || ret != 0)
+   flg = task_get_flags(task);
+
+   if (((flg & RETRO_TASK_FLG_CANCELLED) > 0) || ret != 0)
    {
       task_set_error(task, dec->callback_error);
       file_archive_parse_file_iterate_stop(&dec->archive);
@@ -351,7 +352,10 @@ void *task_push_decompress(
    tmp[++_len]         = '\0';
 
    t->title            = strdup(tmp);
-   t->mute             = mute;
+   if (mute)
+      t->flags        |=  RETRO_TASK_FLG_MUTE;
+   else
+      t->flags        &= ~RETRO_TASK_FLG_MUTE;
 
    task_queue_push(t);
 

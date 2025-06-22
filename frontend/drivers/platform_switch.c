@@ -76,6 +76,37 @@ static enum frontend_fork switch_fork_mode = FRONTEND_FORK_NONE;
 bool platform_switch_has_focus = true;
 
 #ifdef HAVE_LIBNX
+char *SWITCH_CPU_PROFILES[] = {
+    "Maximum Performance",
+    "High Performance",
+    "Boost Performance",
+    "Stock Performance",
+    "Powersaving Mode 1",
+    "Powersaving Mode 2",
+    "Powersaving Mode 3",
+    NULL
+};
+char *SWITCH_CPU_SPEEDS[] = {
+    "1785 MHz",
+    "1581 MHz",
+    "1224 MHz",
+    "1020 MHz",
+    "918 MHz",
+    "816 MHz",
+    "714 MHz",
+    NULL
+};
+unsigned SWITCH_CPU_SPEEDS_VALUES[] = {
+    1785000000,
+    1581000000,
+    1224000000,
+    1020000000,
+    918000000,
+    816000000,
+    714000000,
+    0
+};
+
 static bool psmInitialized  = false;
 
 static AppletHookCookie applet_hook_cookie;
@@ -86,8 +117,8 @@ extern bool nxlink_connected;
 
 void libnx_apply_overclock(void)
 {
-   const size_t profiles_count = sizeof(SWITCH_CPU_PROFILES) 
-      / sizeof(SWITCH_CPU_PROFILES[1]);
+   const size_t profiles_count = sizeof(SWITCH_CPU_PROFILES)
+      / sizeof(SWITCH_CPU_PROFILES[1]) - 1;
    settings_t *settings        = config_get_ptr();
    unsigned libnx_overclock    = settings->uints.libnx_overclock;
 
@@ -565,7 +596,7 @@ static void frontend_switch_init(void *data)
    bool recording_supported      = false;
 
    nifmInitialize(NifmServiceType_User);
-   
+
    if (hosversionBefore(8, 0, 0))
       pcvInitialize();
    else
@@ -609,8 +640,8 @@ static int frontend_switch_parse_drive_list(void *data, bool load_content)
 {
 #ifndef IS_SALAMANDER
    file_list_t *list = (file_list_t *)data;
-   enum msg_hash_enums enum_idx = load_content 
-      ? MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR 
+   enum msg_hash_enums enum_idx = load_content
+      ? MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR
       : MENU_ENUM_LABEL_FILE_BROWSER_DIRECTORY;
 
    if (!list)
@@ -637,7 +668,7 @@ static uint64_t frontend_switch_get_total_mem(void)
    return mem_info.usmblks;
 }
 
-static enum frontend_powerstate 
+static enum frontend_powerstate
 frontend_switch_get_powerstate(int *seconds, int *percent)
 {
    uint32_t pct;
@@ -671,9 +702,10 @@ frontend_switch_get_powerstate(int *seconds, int *percent)
    return FRONTEND_POWERSTATE_NO_SOURCE;
 }
 
-static void frontend_switch_get_os(
+static size_t frontend_switch_get_os(
       char *s, size_t len, int *major, int *minor)
 {
+   size_t _len;
 #ifdef HAVE_LIBNX
    u32 hosVersion;
 #else
@@ -684,7 +716,7 @@ static void frontend_switch_get_os(
    ipc_request_t rq;
 #endif
 
-   strlcpy(s, "Horizon OS", len);
+   _len       = strlcpy(s, "Horizon OS", len);
 
 #ifdef HAVE_LIBNX
    *major     = 0;
@@ -716,8 +748,8 @@ fail_object:
 fail_sm:
    sm_finalize();
 fail:
-   return;
 #endif
+   return _len;
 }
 
 static void frontend_switch_get_name(char *s, size_t len)

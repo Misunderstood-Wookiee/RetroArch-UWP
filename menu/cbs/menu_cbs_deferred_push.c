@@ -16,7 +16,6 @@
 #include <compat/strl.h>
 #include <file/file_path.h>
 #include <string/stdstring.h>
-#include <lists/string_list.h>
 
 #ifdef HAVE_CONFIG_H
 #include "../../config.h"
@@ -152,6 +151,7 @@ GENERIC_DEFERRED_PUSH(deferred_push_input_overlay,                  DISPLAYLIST_
 GENERIC_DEFERRED_PUSH(deferred_push_input_osk_overlay,              DISPLAYLIST_OSK_OVERLAYS)
 GENERIC_DEFERRED_PUSH(deferred_push_video_font_path,                DISPLAYLIST_VIDEO_FONTS)
 GENERIC_DEFERRED_PUSH(deferred_push_xmb_font_path,                  DISPLAYLIST_FONTS)
+GENERIC_DEFERRED_PUSH(deferred_push_ozone_font_path,                DISPLAYLIST_FONTS)
 GENERIC_DEFERRED_PUSH(deferred_push_content_history_path,           DISPLAYLIST_CONTENT_HISTORY)
 GENERIC_DEFERRED_PUSH(deferred_push_disc_information,               DISPLAYLIST_DISC_INFO)
 GENERIC_DEFERRED_PUSH(deferred_push_system_information,             DISPLAYLIST_SYSTEM_INFO)
@@ -295,6 +295,10 @@ GENERIC_DEFERRED_PUSH(deferred_push_core_information_steam_list,    DISPLAYLIST_
 
 GENERIC_DEFERRED_PUSH(deferred_push_file_browser_select_sideload_core, DISPLAYLIST_FILE_BROWSER_SELECT_SIDELOAD_CORE)
 
+#ifdef HAVE_GAME_AI
+GENERIC_DEFERRED_PUSH(deferred_push_core_game_ai_options,             DISPLAYLIST_OPTIONS_GAME_AI)
+#endif
+
 static int deferred_push_cursor_manager_list_deferred(
       menu_displaylist_info_t *info)
 {
@@ -302,18 +306,18 @@ static int deferred_push_cursor_manager_list_deferred(
    const char *path               = info->path;
    settings_t *settings           = NULL;
    config_file_t *conf            = NULL;
-   struct config_entry_list 
+   struct config_entry_list
       *query_entry                = NULL;
-   struct config_entry_list 
+   struct config_entry_list
       *rdb_entry                  = NULL;
-   
+
    if (!(conf = config_file_new_from_path_to_string(path)))
       return -1;
-   
+
    query_entry                    = config_get_entry(conf, "query");
    rdb_entry                      = config_get_entry(conf, "rdb");
 
-   if (     
+   if (
             !query_entry
          ||  (string_is_empty(query_entry->value))
          || !rdb_entry
@@ -325,11 +329,11 @@ static int deferred_push_cursor_manager_list_deferred(
    }
 
    settings = config_get_ptr();
-   
+
    fill_pathname_join_special(rdb_path,
          settings->paths.path_content_database,
          rdb_entry->value, sizeof(rdb_path));
-   
+
    if (!string_is_empty(info->path_b))
       free(info->path_b);
 
@@ -343,7 +347,7 @@ static int deferred_push_cursor_manager_list_deferred(
 
    info->path_c    = strdup(query_entry->value);
    info->path      = strdup(rdb_path);
-   
+
    config_file_free(conf);
 
    return deferred_push_dlist(info, DISPLAYLIST_DATABASE_QUERY, settings);
@@ -354,22 +358,34 @@ static int deferred_push_cursor_manager_list_generic(
       menu_displaylist_info_t *info, enum database_query_type type)
 {
    char query[256];
-   int ret                       = -1;
-   const char *path              = info->path;
-   struct string_list str_list   = {0};
-   settings_t *settings          = config_get_ptr();
-   
+   char *tok, *save  = NULL;
+   char *elem0       = NULL;
+   char *elem1       = NULL;
+   char *path_cpy    = NULL;
+   const char *path  = info->path;
+
    if (!path)
-      goto end;
+      return -1;
 
-   string_list_initialize(&str_list);
-   string_split_noalloc(&str_list, path, "|");
+   path_cpy = strdup(path);
+   tok      = strtok_r(path_cpy, "|", &save);
 
-   database_info_build_query_enum(query, sizeof(query), type,
-         str_list.elems[0].data);
+   if (tok)
+      elem0 = strdup(tok);
+   if ((tok = strtok_r(NULL, "|", &save)))
+      elem1 = strdup(tok);
+   free(path_cpy);
+
+   database_info_build_query_enum(query, sizeof(query), type, elem0);
 
    if (string_is_empty(query))
-      goto end;
+   {
+      if (elem0)
+         free(elem0);
+      if (elem1)
+         free(elem1);
+      return -1;
+   }
 
    if (!string_is_empty(info->path_b))
       free(info->path_b);
@@ -378,15 +394,11 @@ static int deferred_push_cursor_manager_list_generic(
    if (!string_is_empty(info->path))
       free(info->path);
 
-   info->path   = strdup(str_list.elems[1].data);
-   info->path_b = strdup(str_list.elems[0].data);
+   info->path   = elem1;
+   info->path_b = elem0;
    info->path_c = strdup(query);
 
-   ret = deferred_push_dlist(info, DISPLAYLIST_DATABASE_QUERY, settings);
-
-end:
-   string_list_deinitialize(&str_list);
-   return ret;
+   return deferred_push_dlist(info, DISPLAYLIST_DATABASE_QUERY, config_get_ptr());
 }
 
 GENERIC_DEFERRED_CURSOR_MANAGER(deferred_push_cursor_manager_list_deferred_query_rdb_entry_max_users, DATABASE_QUERY_ENTRY_MAX_USERS)
@@ -407,23 +419,39 @@ GENERIC_DEFERRED_CURSOR_MANAGER(deferred_push_cursor_manager_list_deferred_query
 GENERIC_DEFERRED_CURSOR_MANAGER(deferred_push_cursor_manager_list_deferred_query_rdb_entry_releaseyear, DATABASE_QUERY_ENTRY_RELEASEDATE_YEAR)
 #endif
 
+#define CHECK_SIZE(desired_size) \
+    do { \
+      char *reallocated; \
+      size_t dsize = (desired_size); \
+      if (_len + dsize < size) \
+         break; \
+      reallocated = realloc(newstr2, size += dsize * 2); \
+      if (!reallocated) { \
+         free(newstr2); \
+         return -1; \
+      } \
+      newstr2 = reallocated; \
+    } while (0);
+
 static int general_push(menu_displaylist_info_t *info,
       unsigned id, enum menu_displaylist_ctl_state state)
 {
-   char newstring2[PATH_MAX_LENGTH];
+   size_t _len                                = 0;
+   size_t size                                = PATH_MAX_LENGTH;
+   char *newstr2                              = malloc(size);
    settings_t                  *settings      = config_get_ptr();
    menu_handle_t                  *menu       = menu_state_get_ptr()->driver_data;
 #if defined(HAVE_FFMPEG) || defined(HAVE_MPV) || defined (HAVE_AUDIOMIXER)
-   bool 
+   bool
       multimedia_builtin_mediaplayer_enable   = settings->bools.multimedia_builtin_mediaplayer_enable;
 #endif
 #ifdef HAVE_IMAGEVIEWER
    bool multimedia_builtin_imageviewer_enable = settings->bools.multimedia_builtin_imageviewer_enable;
 #endif
 
-   if (!menu)
+   if (!menu || !newstr2)
       return -1;
-   
+
    if (   (id == PUSH_ARCHIVE_OPEN_DETECT_CORE)
        || (id == PUSH_ARCHIVE_OPEN))
    {
@@ -435,14 +463,13 @@ static int general_push(menu_displaylist_info_t *info,
       else
       {
          char tmp_path[PATH_MAX_LENGTH];
-         fill_pathname_expand_special(tmp_path, menu->scratch2_buf, sizeof(tmp_path));
-         const char *menu_path = tmp_path;
-         fill_pathname_join_special(tmp_str, menu_path,
+         fill_pathname_expand_special(tmp_path,
+               menu->scratch2_buf, sizeof(tmp_path));
+         fill_pathname_join_special(tmp_str, tmp_path,
                menu->scratch_buf, sizeof(tmp_str));
       }
 #else
-      const char *menu_path = menu->scratch2_buf;
-      fill_pathname_join_special(tmp_str, menu_path,
+      fill_pathname_join_special(tmp_str, menu->scratch2_buf,
             menu->scratch_buf, sizeof(tmp_str));
 #endif
 
@@ -457,18 +484,20 @@ static int general_push(menu_displaylist_info_t *info,
    info->type_default = FILE_TYPE_PLAIN;
    if (id != PUSH_DETECT_CORE_LIST)
       info->setting   = menu_setting_find_enum(info->enum_idx);
-   newstring2[0]      = '\0';
+
+   newstr2[0] = '\0';
 
    switch (id)
    {
       case PUSH_ARCHIVE_OPEN:
          {
-            struct retro_system_info *sysinfo = 
+            struct retro_system_info *sysinfo =
                &runloop_state_get_ptr()->system.info;
-            if (sysinfo)
-               if (!string_is_empty(sysinfo->valid_extensions))
-                  strlcpy(newstring2, sysinfo->valid_extensions,
-                        sizeof(newstring2));
+            if (sysinfo && !string_is_empty(sysinfo->valid_extensions))
+            {
+               CHECK_SIZE(strlen(sysinfo->valid_extensions));
+               _len += strlcpy(newstr2 + _len, sysinfo->valid_extensions, size - _len);
+            }
          }
          break;
       case PUSH_DEFAULT:
@@ -487,127 +516,58 @@ static int general_push(menu_displaylist_info_t *info,
 
             if (!string_is_empty(valid_extensions))
             {
-               struct string_list str_list3 = {0};
-
-               string_list_initialize(&str_list3);
-               string_split_noalloc(&str_list3, valid_extensions, "|");
-
+               CHECK_SIZE(strlen(valid_extensions) + 12);
+               _len += strlcpy(newstr2 + _len, valid_extensions, size - _len);
 #ifdef HAVE_IBXM
-               {
-                  union string_list_elem_attr attr;
-                  attr.i = 0;
-                  string_list_append(&str_list3, "s3m", attr);
-                  string_list_append(&str_list3, "mod", attr);
-                  string_list_append(&str_list3, "xm", attr);
-               }
+               _len += strlcpy(newstr2 + _len, "|s3m|mod|xm", size - _len);
 #endif
-               string_list_join_concat(newstring2, sizeof(newstring2),
-                     &str_list3, "|");
-               string_list_deinitialize(&str_list3);
             }
          }
          break;
       case PUSH_ARCHIVE_OPEN_DETECT_CORE:
       case PUSH_DETECT_CORE_LIST:
          {
-            union string_list_elem_attr attr;
-            char newstring[PATH_MAX_LENGTH];
-            struct string_list str_list2      = {0};
-            struct retro_system_info *sysinfo = 
+            struct retro_system_info *sysinfo =
                &runloop_state_get_ptr()->system.info;
             bool filter_by_current_core       = settings->bools.filter_by_current_core;
 
-            newstring[0]                      = '\0';
-            attr.i                            = 0;
-
-            string_list_initialize(&str_list2);
-
-            if (sysinfo)
+            if (sysinfo && !string_is_empty(sysinfo->valid_extensions)
+                && filter_by_current_core)
             {
-               if (!string_is_empty(sysinfo->valid_extensions))
-               {
-                  unsigned x;
-                  struct string_list  str_list    = {0};
-
-                  string_list_initialize(&str_list);
-                  string_split_noalloc(&str_list,
-                        sysinfo->valid_extensions, "|");
-
-                  for (x = 0; x < str_list.size; x++)
-                  {
-                     const char *elem = str_list.elems[x].data;
-                     string_list_append(&str_list2, elem, attr);
-                  }
-
-                  string_list_deinitialize(&str_list);
-               }
+               CHECK_SIZE(strlen(sysinfo->valid_extensions));
+               _len += strlcpy(newstr2 + _len, sysinfo->valid_extensions, size - _len);
             }
-
-            if (!filter_by_current_core)
+            else
             {
                core_info_list_t *list = NULL;
                core_info_get_list(&list);
                if (list && !string_is_empty(list->all_ext))
                {
-                  unsigned x;
-                  struct string_list str_list  = {0};
-                  string_list_initialize(&str_list);
-
-                  string_split_noalloc(&str_list, 
-                        list->all_ext, "|");
-
-                  for (x = 0; x < str_list.size; x++)
-                  {
-                     if (!string_list_find_elem(&str_list2,
-                              str_list.elems[x].data))
-                     {
-                        const char *elem = str_list.elems[x].data;
-                        string_list_append(&str_list2, elem, attr);
-                     }
-                  }
-
-                  string_list_deinitialize(&str_list);
+                  CHECK_SIZE(strlen(list->all_ext));
+                  _len += strlcpy(newstr2 + _len, list->all_ext, size - _len);
                }
             }
-
-            string_list_join_concat(newstring, sizeof(newstring),
-                  &str_list2, "|");
-
-            {
-               struct string_list  str_list3  = {0};
-               string_list_initialize(&str_list3);
-               string_split_noalloc(&str_list3, newstring, "|");
-
 #if defined(HAVE_AUDIOMIXER)
-               if (multimedia_builtin_mediaplayer_enable)
-               {
-                  union string_list_elem_attr attr;
-                  attr.i = 0;
+            if (multimedia_builtin_mediaplayer_enable)
+            {
+               CHECK_SIZE(28);
 #if defined(HAVE_DR_MP3)
-                  string_list_append(&str_list3, "mp3", attr);
+               _len += strlcpy(newstr2 + _len, "|mp3", size - _len);
 #endif
 #if defined(HAVE_STB_VORBIS)
-                  string_list_append(&str_list3, "ogg", attr);
+               _len += strlcpy(newstr2 + _len, "|ogg", size - _len);
 #endif
 #if defined(HAVE_DR_FLAC)
-                  string_list_append(&str_list3, "flac", attr);
+               _len += strlcpy(newstr2 + _len, "|flac", size - _len);
 #endif
 #if defined(HAVE_RWAV)
-                  string_list_append(&str_list3, "wav", attr);
+               _len += strlcpy(newstr2 + _len, "|wav", size - _len);
 #endif
 #ifdef HAVE_IBXM
-
-                  string_list_append(&str_list3, "s3m", attr);
-                  string_list_append(&str_list3, "mod", attr);
-                  string_list_append(&str_list3, "xm", attr);
+               _len += strlcpy(newstr2 + _len, "|s3m|mod|xm", size - _len);
 #endif
-               }
-#endif
-               string_list_join_concat(newstring2, sizeof(newstring2),
-                     &str_list3, "|");
-               string_list_deinitialize(&str_list3);
             }
-            string_list_deinitialize(&str_list2);
+#endif
          }
          break;
    }
@@ -621,8 +581,10 @@ static int general_push(menu_displaylist_info_t *info,
 #elif defined(HAVE_MPV)
       libretro_mpv_retro_get_system_info(&sysinfo);
 #endif
-      strlcat(newstring2, "|", sizeof(newstring2));
-      strlcat(newstring2, sysinfo.valid_extensions, sizeof(newstring2));
+      CHECK_SIZE(strlen(sysinfo.valid_extensions) + 1);
+      if (_len > 0)
+         newstr2[_len++] = '|';
+      _len += strlcpy(newstr2 + _len, sysinfo.valid_extensions, size - _len);
    }
 #endif
 
@@ -631,21 +593,26 @@ static int general_push(menu_displaylist_info_t *info,
    {
       struct retro_system_info sysinfo = {0};
       libretro_imageviewer_retro_get_system_info(&sysinfo);
-      strlcat(newstring2, "|", sizeof(newstring2));
-      strlcat(newstring2, sysinfo.valid_extensions,
-            sizeof(newstring2));
+      CHECK_SIZE(strlen(sysinfo.valid_extensions) + 1);
+      if (_len > 0)
+         newstr2[_len++] = '|';
+      _len += strlcpy(newstr2 + _len, sysinfo.valid_extensions, size - _len);
    }
 #endif
 
-   if (!string_is_empty(newstring2))
+   if (!string_is_empty(newstr2))
    {
       if (info->exts)
          free(info->exts);
-      info->exts = strdup(newstring2);
+      info->exts = newstr2;
    }
+   else
+      free(newstr2);
 
    return deferred_push_dlist(info, state, settings);
 }
+
+#undef CHECK_SIZE
 
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_detect_core_list, PUSH_DETECT_CORE_LIST, DISPLAYLIST_CORES_DETECTED)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_archive_open_detect_core, PUSH_ARCHIVE_OPEN_DETECT_CORE, DISPLAYLIST_DEFAULT)
@@ -663,6 +630,7 @@ GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list, PUSH_DEFAULT, DIS
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_special, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_SPECIAL)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_resolution, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_RESOLUTION)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_audio_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_AUDIO_DEVICE)
+GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_midi_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_MIDI_DEVICE)
 #ifdef HAVE_MICROPHONE
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_microphone_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_MICROPHONE_DEVICE)
 #endif
@@ -677,9 +645,11 @@ GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_playlist_sort_mode
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_manual_content_scan_system_name, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_MANUAL_CONTENT_SCAN_SYSTEM_NAME)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_manual_content_scan_core_name, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_MANUAL_CONTENT_SCAN_CORE_NAME)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_disk_index, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_DISK_INDEX)
+GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_retropad_bind, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_RETROPAD_BIND)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_device_type, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DEVICE_TYPE)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_description, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_description_kbd, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION_KBD)
+GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_select_reserved_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_SELECT_RESERVED_DEVICE)
 #ifdef ANDROID
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_select_physical_keyboard, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD)
 #endif
@@ -687,19 +657,20 @@ GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_input_select_physi
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_netplay_mitm_server, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_NETPLAY_MITM_SERVER)
 #endif
 GENERIC_DEFERRED_PUSH(deferred_push_add_to_playlist_list,          DISPLAYLIST_ADD_TO_PLAYLIST_LIST)
+GENERIC_DEFERRED_PUSH(deferred_push_add_to_playlist_quickmenu,     DISPLAYLIST_ADD_TO_PLAYLIST_QUICKMENU)
 
 static int menu_cbs_init_bind_deferred_push_compare_label(
       menu_file_list_cbs_t *cbs,
       const char *label)
 {
    unsigned i;
-   typedef struct deferred_info_list 
+   typedef struct deferred_info_list
    {
       enum msg_hash_enums type;
       int (*cb)(menu_displaylist_info_t *info);
    } deferred_info_list_t;
 
-   const deferred_info_list_t info_list[] = {
+   static const deferred_info_list_t info_list[] = {
       {MENU_ENUM_LABEL_DEFERRED_DUMP_DISC_LIST, deferred_push_dump_disk_list},
 #ifdef HAVE_LAKKA
       {MENU_ENUM_LABEL_DEFERRED_EJECT_DISC, deferred_push_eject_disc},
@@ -710,6 +681,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_SPECIAL, deferred_push_dropdown_box_list_special},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_RESOLUTION, deferred_push_dropdown_box_list_resolution},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_AUDIO_DEVICE, deferred_push_dropdown_box_list_audio_device},
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MIDI_DEVICE, deferred_push_dropdown_box_list_midi_device},
 #ifdef HAVE_MICROPHONE
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE, deferred_push_dropdown_box_list_microphone_device},
       {MENU_ENUM_LABEL_DEFERRED_MICROPHONE_SETTINGS_LIST, deferred_push_microphone_settings_list},
@@ -723,9 +695,11 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_PLAYLIST_LEFT_THUMBNAIL_MODE, deferred_push_dropdown_box_list_playlist_left_thumbnail_mode},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_PLAYLIST_SORT_MODE, deferred_push_dropdown_box_list_playlist_sort_mode},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_DISK_INDEX, deferred_push_dropdown_box_list_disk_index},
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_RETROPAD_BIND, deferred_push_dropdown_box_list_input_retropad_bind},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DEVICE_TYPE, deferred_push_dropdown_box_list_input_device_type},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION, deferred_push_dropdown_box_list_input_description},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION_KBD, deferred_push_dropdown_box_list_input_description_kbd},
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_RESERVED_DEVICE, deferred_push_dropdown_box_list_input_select_reserved_device},
 #ifdef ANDROID
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD, deferred_push_dropdown_box_list_input_select_physical_keyboard},
 #endif
@@ -914,6 +888,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_INPUT_OSK_OVERLAY, deferred_push_input_osk_overlay},
       {MENU_ENUM_LABEL_VIDEO_FONT_PATH, deferred_push_video_font_path},
       {MENU_ENUM_LABEL_XMB_FONT, deferred_push_xmb_font_path},
+      {MENU_ENUM_LABEL_OZONE_FONT, deferred_push_ozone_font_path},
       {MENU_ENUM_LABEL_CHEAT_FILE_LOAD, deferred_push_cheat_file_load},
       {MENU_ENUM_LABEL_CHEAT_FILE_LOAD_APPEND, deferred_push_cheat_file_load_append},
       {MENU_ENUM_LABEL_REMAP_FILE_LOAD, deferred_push_remap_file_load},
@@ -949,6 +924,11 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_LAKKA_LIST, deferred_push_lakka_list},
 #endif
        {MENU_ENUM_LABEL_DEFERRED_ADD_TO_PLAYLIST_LIST, deferred_push_add_to_playlist_list},
+       {MENU_ENUM_LABEL_DEFERRED_ADD_TO_PLAYLIST_QUICKMENU, deferred_push_add_to_playlist_quickmenu},
+
+#ifdef HAVE_GAME_AI
+      {MENU_ENUM_LABEL_CORE_GAME_AI_OPTIONS, deferred_push_core_game_ai_options},
+#endif
    };
 
    if (!string_is_equal(label, "null"))
@@ -1015,7 +995,7 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
             break;
          case MENU_ENUM_LABEL_DEFERRED_ACCOUNTS_FACEBOOK_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_accounts_facebook_list);
-            break;            
+            break;
          case MENU_ENUM_LABEL_DEFERRED_ARCHIVE_ACTION_DETECT_CORE:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_archive_action_detect_core);
             break;
@@ -1275,6 +1255,9 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
          case MENU_ENUM_LABEL_XMB_FONT:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_xmb_font_path);
             break;
+         case MENU_ENUM_LABEL_OZONE_FONT:
+            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_ozone_font_path);
+            break;
          case MENU_ENUM_LABEL_CONTENT_HISTORY_PATH:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_content_history_path);
             break;
@@ -1413,6 +1396,14 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
          case MENU_ENUM_LABEL_DEFERRED_ADD_TO_PLAYLIST_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_add_to_playlist_list);
             break;
+         case MENU_ENUM_LABEL_DEFERRED_ADD_TO_PLAYLIST_QUICKMENU:
+            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_add_to_playlist_quickmenu);
+            break;
+#ifdef HAVE_GAME_AI
+         case MENU_ENUM_LABEL_CORE_GAME_AI_OPTIONS:
+            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_core_game_ai_options);
+            break;
+#endif
          default:
             return -1;
       }

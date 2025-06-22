@@ -74,20 +74,20 @@ RetroArch has been ported to the following platforms:
    - FreeBSD
    - Haiku
    - Linux
+   - Original Microsoft Xbox
    - Microsoft Xbox 360 (Libxenon/XeXDK)
    - Microsoft Xbox One
    - Microsoft Xbox Series S/X
    - Miyoo
    - NetBSD
-   - Nintendo 3DS/2DS
-   - Nintendo GameCube
    - Nintendo NES/SNES Classic Edition
-   - Nintendo Switch
+   - Nintendo GameCube
    - Nintendo Wii
+   - Nintendo Switch
    - Nintendo Wii U
+   - Nintendo 3DS/2DS
    - OpenBSD
    - OpenDingux
-   - Original Microsoft Xbox
    - PlayStation2
    - PlayStation3
    - PlayStation4
@@ -95,21 +95,22 @@ RetroArch has been ported to the following platforms:
    - PlayStation Vita
    - Raspberry Pi
    - ReactOS
+   - Redox OS
    - RetroFW
    - RS90
    - SerenityOS
    - Solaris
-   - Windows 10
-   - Windows 11
-   - Windows 2000
-   - Windows 7
-   - Windows 8
+   - Windows NT 3.5
    - Windows 95
    - Windows 98
-   - Windows Millennium
-   - Windows NT 3.5
-   - Windows Vista
+   - Windows 2000
    - Windows XP
+   - Windows Millennium
+   - Windows Vista
+   - Windows 7
+   - Windows 8
+   - Windows 10
+   - Windows 11
 
 ## Dependencies (PC)
 
@@ -123,7 +124,7 @@ following dependencies come as recommended:
    - GL headers / Vulkan headers
    - X11 headers and libs, or EGL/KMS/GBM
 
-OSX port of RetroArch requires latest versions of XCode to build.
+OSX port of RetroArch requires latest versions of Xcode to build.
 
 RetroArch can utilize these libraries if enabled:
 
@@ -140,6 +141,7 @@ RetroArch needs at least one of these audio driver libraries:
    - JACK
    - SDL
    - PulseAudio
+   - PipeWire
    - XAudio2 (Win32, Xbox 360)
    - DirectSound (Win32, Xbox 1)
    - CoreAudio (OSX, iOS)

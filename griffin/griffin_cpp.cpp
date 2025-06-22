@@ -79,7 +79,7 @@ VIDEO DRIVER
 #endif
 
 #if defined(HAVE_SPIRV_CROSS)
-#if defined(ENABLE_HLSL)
+#if defined(HAVE_HLSL)
 #include "../deps/SPIRV-Cross/spirv_hlsl.cpp"
 #endif
 #include "../deps/SPIRV-Cross/spirv_cross.cpp"
@@ -120,3 +120,4 @@ FONTS
 #include "../deps/discord-rpc/src/connection_unix.cpp"
 #endif
 #endif
+

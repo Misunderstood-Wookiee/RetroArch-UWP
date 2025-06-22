@@ -48,6 +48,9 @@ void handle_dbscan_finished(retro_task_t *task,
 int action_scan_file(const char *path,
       const char *label, unsigned type, size_t idx)
 {
+#if IOS
+   char dir_path[DIR_MAX_LENGTH];
+#endif
    char fullpath[PATH_MAX_LENGTH];
    const char *menu_path          = NULL;
    settings_t *settings           = config_get_ptr();
@@ -58,7 +61,6 @@ int action_scan_file(const char *path,
    menu_entries_get_last_stack(&menu_path, NULL, NULL, NULL, NULL);
 
 #if IOS
-   char dir_path[PATH_MAX_LENGTH];
    fill_pathname_expand_special(dir_path, menu_path, sizeof(dir_path));
    menu_path = dir_path;
 #endif
@@ -78,6 +80,9 @@ int action_scan_file(const char *path,
 int action_scan_directory(const char *path,
       const char *label, unsigned type, size_t idx)
 {
+#if IOS
+   char dir_path[DIR_MAX_LENGTH];
+#endif
    char fullpath[PATH_MAX_LENGTH];
    const char *menu_path          = NULL;
    settings_t *settings           = config_get_ptr();
@@ -88,7 +93,6 @@ int action_scan_directory(const char *path,
    menu_entries_get_last_stack(&menu_path, NULL, NULL, NULL, NULL);
 
 #if IOS
-   char dir_path[PATH_MAX_LENGTH];
    fill_pathname_expand_special(dir_path, menu_path, sizeof(dir_path));
    menu_path = dir_path;
 #endif
@@ -109,6 +113,7 @@ int action_scan_directory(const char *path,
 }
 #endif
 
+extern int action_cycle_thumbnail(unsigned mode);
 int action_switch_thumbnail(const char *path,
       const char *label, unsigned type, size_t idx)
 {
@@ -120,61 +125,20 @@ int action_switch_thumbnail(const char *path,
 #ifdef HAVE_RGUI
    switch_enabled             = !string_is_equal(menu_ident, "rgui");
 #endif
-#ifdef HAVE_MATERIALUI
-   switch_enabled             = switch_enabled && !string_is_equal(menu_ident, "glui");
-#endif
 
    if (!settings)
       return -1;
 
    /* RGUI has its own cycling for thumbnails in order to allow
     * cycling all images in fullscreen mode.
-    * GLUI is a special case where thumbnail 'switch' corresponds to
-    * changing thumbnail view mode.
     * For other menu drivers, we cycle through available thumbnail
     * types and skip if already visible. */
    if (switch_enabled)
    {
-      if (settings->uints.gfx_thumbnails == 0)
-      {
-         configuration_set_uint(settings,
-               settings->uints.menu_left_thumbnails,
-               settings->uints.menu_left_thumbnails + 1);
-
-         if (settings->uints.gfx_thumbnails == settings->uints.menu_left_thumbnails)
-            configuration_set_uint(settings,
-                  settings->uints.menu_left_thumbnails,
-                  settings->uints.menu_left_thumbnails + 1);
-
-         if (settings->uints.menu_left_thumbnails > 3)
-            configuration_set_uint(settings,
-                  settings->uints.menu_left_thumbnails, 1);
-
-         if (settings->uints.gfx_thumbnails == settings->uints.menu_left_thumbnails)
-            configuration_set_uint(settings,
-                  settings->uints.menu_left_thumbnails,
-                  settings->uints.menu_left_thumbnails + 1);
-      }
+      if (settings->uints.gfx_thumbnails)
+         action_cycle_thumbnail(MENU_ACTION_CYCLE_THUMBNAIL_PRIMARY);
       else
-      {
-         configuration_set_uint(settings,
-               settings->uints.gfx_thumbnails,
-               settings->uints.gfx_thumbnails + 1);
-
-         if (settings->uints.gfx_thumbnails == settings->uints.menu_left_thumbnails)
-            configuration_set_uint(settings,
-                  settings->uints.gfx_thumbnails,
-                  settings->uints.gfx_thumbnails + 1);
-
-         if (settings->uints.gfx_thumbnails > 3)
-            configuration_set_uint(settings,
-                  settings->uints.gfx_thumbnails, 1);
-
-         if (settings->uints.gfx_thumbnails == settings->uints.menu_left_thumbnails)
-            configuration_set_uint(settings,
-                  settings->uints.gfx_thumbnails,
-                  settings->uints.gfx_thumbnails + 1);
-      }
+         action_cycle_thumbnail(MENU_ACTION_CYCLE_THUMBNAIL_PRIMARY);
 
       if (menu_st->driver_ctx)
       {
@@ -231,7 +195,7 @@ static int action_scan_input_desc(const char *path,
       inp_desc_user      = (unsigned)(player_no_str - 1);
       /* This hardcoded value may cause issues if any entries are added on
          top of the input binds */
-      key                = (unsigned)(idx - 6);
+      key                = (unsigned)(idx - 8);
       /* Select the reorderer bind */
       key                =
             (key < RARCH_ANALOG_BIND_LIST_END) ? input_config_bind_order[key] : key;
@@ -273,6 +237,19 @@ static int action_scan_video_xmb_font(const char *path,
    settings_t *settings       = config_get_ptr();
 
    strlcpy(settings->paths.path_menu_xmb_font, "null", sizeof(settings->paths.path_menu_xmb_font));
+   command_event(CMD_EVENT_REINIT, NULL);
+
+   return 0;
+}
+#endif
+
+#ifdef HAVE_OZONE
+static int action_scan_video_ozone_font(const char *path,
+      const char *label, unsigned type, size_t idx)
+{
+   settings_t *settings       = config_get_ptr();
+
+   strlcpy(settings->paths.path_menu_ozone_font, "null", sizeof(settings->paths.path_menu_ozone_font));
    command_event(CMD_EVENT_REINIT, NULL);
 
    return 0;
@@ -341,6 +318,13 @@ int menu_cbs_init_bind_scan(menu_file_list_cbs_t *cbs,
             else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_XMB_FONT)))
             {
                BIND_ACTION_SCAN(cbs, action_scan_video_xmb_font);
+               return 0;
+            }
+#endif
+#ifdef HAVE_OZONE
+            else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_OZONE_FONT)))
+            {
+               BIND_ACTION_SCAN(cbs, action_scan_video_ozone_font);
                return 0;
             }
 #endif

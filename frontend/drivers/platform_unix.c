@@ -114,7 +114,7 @@ enum platform_android_flags
 };
 
 static pthread_key_t thread_key;
-static char app_dir[PATH_MAX_LENGTH];
+static char app_dir[DIR_MAX_LENGTH];
 unsigned storage_permissions             = 0;
 struct android_app *g_android            = NULL;
 static uint8_t g_platform_android_flags  = 0;
@@ -136,7 +136,7 @@ static char unix_cpu_model_name[64]      = {0};
 #define PROC_MEMINFO_CACHED_TAG          "Cached:"
 #define PROC_MEMINFO_SHMEM_TAG           "Shmem:"
 
-#if (defined(__linux__) || defined(__unix__)) && !defined(ANDROID)
+#if (defined(__linux__) || defined(__HAIKU__) || defined(__unix__)) && !defined(ANDROID)
 static int speak_pid                     = 0;
 #endif
 
@@ -1240,39 +1240,38 @@ static enum frontend_architecture frontend_unix_get_arch(void)
    return FRONTEND_ARCH_NONE;
 }
 
-static void frontend_unix_get_os(char *s,
+static size_t frontend_unix_get_os(char *s,
       size_t len, int *major, int *minor)
 {
+   size_t _len = 0;
 #ifdef ANDROID
    int rel;
    frontend_android_get_version(major, minor, &rel);
-
-   strlcpy(s, "Android", len);
+   _len = strlcpy(s, "Android", len);
 #else
    char *ptr;
    struct utsname buffer;
-
    if (uname(&buffer) != 0)
-      return;
-
+      return _len;
    *major = (int)strtol(buffer.release, &ptr, 10);
    *minor = (int)strtol(++ptr, NULL, 10);
 #if defined(__FreeBSD__)
-   strlcpy(s, "FreeBSD", len);
+   _len = strlcpy(s, "FreeBSD", len);
 #elif defined(__NetBSD__)
-   strlcpy(s, "NetBSD", len);
+   _len = strlcpy(s, "NetBSD", len);
 #elif defined(__OpenBSD__)
-   strlcpy(s, "OpenBSD", len);
+   _len = strlcpy(s, "OpenBSD", len);
 #elif defined(__DragonFly__)
-   strlcpy(s, "DragonFly BSD", len);
+   _len = strlcpy(s, "DragonFly BSD", len);
 #elif defined(BSD)
-   strlcpy(s, "BSD", len);
+   _len = strlcpy(s, "BSD", len);
 #elif defined(__HAIKU__)
-   strlcpy(s, "Haiku", len);
+   _len = strlcpy(s, "Haiku", len);
 #else
-   strlcpy(s, "Linux", len);
+   _len = strlcpy(s, "Linux", len);
 #endif
 #endif
+   return _len;
 }
 
 #ifdef HAVE_LAKKA
@@ -1302,7 +1301,7 @@ static void frontend_unix_set_screen_brightness(int value)
 
    /* Device tree should have 'label = "backlight";' if control is desirable */
    filestream_read_file("/sys/class/backlight/backlight/max_brightness",
-                        &buffer, NULL);
+                        (void **)&buffer, NULL);
    if (buffer)
    {
       sscanf(buffer, "%u", &max_brightness);
@@ -1324,6 +1323,13 @@ static void frontend_unix_get_env(int *argc,
 {
    unsigned i;
    const char* libretro_directory = getenv("LIBRETRO_DIRECTORY");
+   const char* libretro_assets_directory = getenv("LIBRETRO_ASSETS_DIRECTORY");
+   const char* libretro_autoconfig_directory = getenv("LIBRETRO_AUTOCONFIG_DIRECTORY");
+   const char* libretro_cheats_directory = getenv("LIBRETRO_CHEATS_DIRECTORY");
+   const char* libretro_database_directory = getenv("LIBRETRO_DATABASE_DIRECTORY");
+   const char* libretro_system_directory = getenv("LIBRETRO_SYSTEM_DIRECTORY");
+   const char* libretro_video_filter_directory = getenv("LIBRETRO_VIDEO_FILTER_DIRECTORY");
+   const char* libretro_video_shader_directory = getenv("LIBRETRO_VIDEO_SHADER_DIRECTORY");
 #ifdef ANDROID
    int32_t major, minor, rel;
    char device_model[PROP_VALUE_MAX]  = {0};
@@ -1482,7 +1488,7 @@ static void frontend_unix_get_env(int *argc,
 
    if (android_app->getStringExtra && jstr)
    {
-      static char apk_dir[PATH_MAX_LENGTH];
+      static char apk_dir[DIR_MAX_LENGTH];
       const char *argv = (*env)->GetStringUTFChars(env, jstr, 0);
 
       *apk_dir = '\0';
@@ -1599,7 +1605,7 @@ static void frontend_unix_get_env(int *argc,
                   sizeof(g_defaults.dirs[DEFAULT_DIR_WALLPAPERS]));
 
             /* This switch tries to handle the different locations for devices with
-               weird write permissions. Should be largelly unnecesary nowadays. Most
+               weird write permissions. Should be largelly unnecessary nowadays. Most
                devices I have tested are INTERNAL_STORAGE_WRITABLE but better safe than sorry */
 
             switch (storage_permissions)
@@ -1765,12 +1771,20 @@ static void frontend_unix_get_env(int *argc,
             "cores", sizeof(g_defaults.dirs[DEFAULT_DIR_CORE_INFO]));
    else
 #endif
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_CORE_INFO], base_path,
-         "cores", sizeof(g_defaults.dirs[DEFAULT_DIR_CORE_INFO]));
+   if (!string_is_empty(libretro_directory))
+      strlcpy(g_defaults.dirs[DEFAULT_DIR_CORE_INFO], libretro_directory,
+            sizeof(g_defaults.dirs[DEFAULT_DIR_CORE_INFO]));
+   else
+      fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_CORE_INFO], base_path,
+            "cores", sizeof(g_defaults.dirs[DEFAULT_DIR_CORE_INFO]));
 #endif
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG], base_path,
-         "autoconfig", sizeof(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG]));
-
+   if (!string_is_empty(libretro_autoconfig_directory))
+      strlcpy(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG],
+	    libretro_autoconfig_directory,
+            sizeof(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG]));
+   else
+       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG], base_path,
+            "autoconfig", sizeof(g_defaults.dirs[DEFAULT_DIR_AUTOCONFIG]));
 #ifdef ASSETS_DIR
    if (path_is_directory(ASSETS_DIR "/assets"))
       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_ASSETS],
@@ -1778,7 +1792,10 @@ static void frontend_unix_get_env(int *argc,
             "assets", sizeof(g_defaults.dirs[DEFAULT_DIR_ASSETS]));
    else
 #endif
-   if (path_is_directory("/usr/local/share/retroarch/assets"))
+   if (!string_is_empty(libretro_assets_directory))
+      strlcpy(g_defaults.dirs[DEFAULT_DIR_ASSETS], libretro_assets_directory,
+	      sizeof(g_defaults.dirs[DEFAULT_DIR_ASSETS]));
+   else if (path_is_directory("/usr/local/share/retroarch/assets"))
       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_ASSETS],
             "/usr/local/share/retroarch",
             "assets", sizeof(g_defaults.dirs[DEFAULT_DIR_ASSETS]));
@@ -1838,7 +1855,11 @@ static void frontend_unix_get_env(int *argc,
             "filters/video", sizeof(g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER]));
    else
 #endif
-   if (path_is_directory("/usr/local/share/retroarch/filters/video"))
+   if (!string_is_empty(libretro_video_filter_directory))
+      strlcpy(g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER],
+	      libretro_video_filter_directory,
+	      sizeof(g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER]));
+   else if (path_is_directory("/usr/local/share/retroarch/filters/video"))
       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER],
             "/usr/local/share/retroarch",
             "filters/video", sizeof(g_defaults.dirs[DEFAULT_DIR_VIDEO_FILTER]));
@@ -1870,12 +1891,27 @@ static void frontend_unix_get_env(int *argc,
          "records_config", sizeof(g_defaults.dirs[DEFAULT_DIR_RECORD_CONFIG]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_RECORD_OUTPUT], base_path,
          "records", sizeof(g_defaults.dirs[DEFAULT_DIR_RECORD_OUTPUT]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_DATABASE], base_path,
-         "database/rdb", sizeof(g_defaults.dirs[DEFAULT_DIR_DATABASE]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SHADER], base_path,
-         "shaders", sizeof(g_defaults.dirs[DEFAULT_DIR_SHADER]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_CHEATS], base_path,
-         "cheats", sizeof(g_defaults.dirs[DEFAULT_DIR_CHEATS]));
+   if (!string_is_empty(libretro_database_directory))
+       strlcpy(g_defaults.dirs[DEFAULT_DIR_DATABASE],
+	       libretro_database_directory,
+	       sizeof(g_defaults.dirs[DEFAULT_DIR_DATABASE]));
+   else
+       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_DATABASE], base_path,
+             "database/rdb", sizeof(g_defaults.dirs[DEFAULT_DIR_DATABASE]));
+   if (!string_is_empty(libretro_video_shader_directory))
+       strlcpy(g_defaults.dirs[DEFAULT_DIR_SHADER],
+	       libretro_video_shader_directory,
+	       sizeof(g_defaults.dirs[DEFAULT_DIR_SHADER]));
+   else
+       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SHADER], base_path,
+             "shaders", sizeof(g_defaults.dirs[DEFAULT_DIR_SHADER]));
+   if (!string_is_empty(libretro_cheats_directory))
+       strlcpy(g_defaults.dirs[DEFAULT_DIR_CHEATS],
+	       libretro_cheats_directory,
+	       sizeof(g_defaults.dirs[DEFAULT_DIR_CHEATS]));
+   else
+       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_CHEATS], base_path,
+             "cheats", sizeof(g_defaults.dirs[DEFAULT_DIR_CHEATS]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_OVERLAY], base_path,
          "overlays", sizeof(g_defaults.dirs[DEFAULT_DIR_OVERLAY]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_OSK_OVERLAY], base_path,
@@ -1892,8 +1928,13 @@ static void frontend_unix_get_env(int *argc,
          "saves", sizeof(g_defaults.dirs[DEFAULT_DIR_SRAM]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SAVESTATE], base_path,
          "states", sizeof(g_defaults.dirs[DEFAULT_DIR_SAVESTATE]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SYSTEM], base_path,
-         "system", sizeof(g_defaults.dirs[DEFAULT_DIR_SYSTEM]));
+   if (!string_is_empty(libretro_system_directory))
+       strlcpy(g_defaults.dirs[DEFAULT_DIR_SYSTEM],
+	       libretro_system_directory,
+	       sizeof(g_defaults.dirs[DEFAULT_DIR_SYSTEM]));
+   else
+       fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SYSTEM], base_path,
+             "system", sizeof(g_defaults.dirs[DEFAULT_DIR_SYSTEM]));
 #endif
 
 #ifndef IS_SALAMANDER
@@ -2092,6 +2133,10 @@ static void frontend_unix_init(void *data)
          "getVolumePath", "(Ljava/lang/String;)Ljava/lang/String;");
    GET_METHOD_ID(env, android_app->inputGrabMouse, class,
          "inputGrabMouse", "(Z)V");
+   GET_METHOD_ID(env, android_app->isScreenReaderEnabled, class,
+         "isScreenReaderEnabled", "()Z");
+   GET_METHOD_ID(env, android_app->accessibilitySpeak, class,
+         "accessibilitySpeak", "(Ljava/lang/String;)V");
 
    GET_OBJECT_CLASS(env, class, obj);
    GET_METHOD_ID(env, android_app->getStringExtra, class,
@@ -2350,11 +2395,11 @@ static bool frontend_unix_set_fork(enum frontend_fork fork_mode)
 static void frontend_unix_exec(const char *path, bool should_load_content)
 {
    char *newargv[]    = { NULL, NULL };
-   size_t len         = strlen(path);
+   size_t _len        = strlen(path);
 
-   newargv[0] = (char*)malloc(len);
+   newargv[0] = (char*)malloc(_len);
 
-   strlcpy(newargv[0], path, len);
+   strlcpy(newargv[0], path, _len);
 
    execv(path, newargv);
 }
@@ -2503,11 +2548,16 @@ static uint64_t frontend_unix_get_free_mem(void)
 static void frontend_unix_sighandler(int sig)
 {
 #ifdef VALGRIND_PRINTF_BACKTRACE
-VALGRIND_PRINTF_BACKTRACE("SIGINT");
+   VALGRIND_PRINTF_BACKTRACE("SIGINT");
 #endif
    (void)sig;
    unix_sighandler_quit++;
-   if (unix_sighandler_quit == 1) {}
+   if (unix_sighandler_quit == 1)
+   {
+#if defined(HAVE_SDL_DINGUX)
+      retroarch_ctl(RARCH_CTL_SET_SHUTDOWN, NULL);
+#endif
+   }
    if (unix_sighandler_quit == 2) exit(1);
    /* in case there's a second deadlock in a C++ destructor or something */
    if (unix_sighandler_quit >= 3) abort();
@@ -2784,7 +2834,7 @@ enum retro_language frontend_unix_get_user_language(void)
    return lang;
 }
 
-#if (defined(__linux__) || defined(__unix__)) && !defined(ANDROID)
+#if (defined(__linux__) || defined(__HAIKU__) || defined(__unix__)) && !defined(ANDROID)
 static bool is_narrator_running_unix(void)
 {
    return (kill(speak_pid, 0) == 0);
@@ -2961,6 +3011,40 @@ end:
 }
 #endif
 
+#ifdef ANDROID
+bool is_screen_reader_enabled(void)
+{
+   JNIEnv *env = jni_thread_getenv();
+   jboolean                  jbool   = JNI_FALSE;
+
+   if (env != NULL)
+      CALL_BOOLEAN_METHOD(env, jbool,
+            g_android->activity->clazz, g_android->isScreenReaderEnabled);
+
+   return jbool == JNI_TRUE;
+}
+
+static bool is_narrator_running_android(void)
+{
+   /* Screen reader is speaking on Android is controlled by the operating
+    * system, so return false to align with the rest of the API. */
+   return false;
+}
+
+static bool accessibility_speak_android(int speed,
+      const char* speak_text, int priority)
+{
+   JNIEnv *env = jni_thread_getenv();
+
+   if (env != NULL)
+      CALL_VOID_METHOD_PARAM(env, g_android->activity->clazz,
+            g_android->accessibilitySpeak,
+            (*env)->NewStringUTF(env, speak_text));
+
+   return true;
+}
+#endif
+
 frontend_ctx_driver_t frontend_ctx_unix = {
    frontend_unix_get_env,       /* get_env */
    frontend_unix_init,          /* init */
@@ -3014,12 +3098,12 @@ frontend_ctx_driver_t frontend_ctx_unix = {
    frontend_unix_set_sustained_performance_mode,
    frontend_unix_get_cpu_model_name,
    frontend_unix_get_user_language,
-#if (defined(__linux__) || defined(__unix__)) && !defined(ANDROID)
+#if (defined(__linux__) || defined(__HAIKU__) || defined(__unix__)) && !defined(ANDROID)
    is_narrator_running_unix,     /* is_narrator_running */
    accessibility_speak_unix,     /* accessibility_speak */
 #else
-   NULL,                         /* is_narrator_running */
-   NULL,                         /* accessibility_speak */
+   is_narrator_running_android,                         /* is_narrator_running */
+   accessibility_speak_android,                         /* accessibility_speak */
 #endif
 #ifdef FERAL_GAMEMODE
    frontend_unix_set_gamemode,

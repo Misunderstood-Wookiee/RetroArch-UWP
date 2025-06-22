@@ -73,9 +73,9 @@ static INLINE bool string_is_equal(const char *a, const char *b)
 }
 
 static INLINE bool string_starts_with_size(const char *str, const char *prefix,
-      size_t size)
+      size_t len)
 {
-   return (str && prefix) ? !strncmp(prefix, str, size) : false;
+   return (str && prefix) ? !strncmp(prefix, str, len) : false;
 }
 
 static INLINE bool string_starts_with(const char *str, const char *prefix)
@@ -106,11 +106,11 @@ static INLINE bool string_ends_with(const char *str, const char *suffix)
  * - If 'str' is not NULL and no '\0' character is found
  *   in the first 'size' characters, returns 'size'
  **/
-static INLINE size_t strlen_size(const char *str, size_t size)
+static INLINE size_t strlen_size(const char *str, size_t len)
 {
    size_t i = 0;
    if (str)
-      while (i < size && str[i]) i++;
+      while (i < len && str[i]) i++;
    return i;
 }
 
@@ -159,8 +159,9 @@ char *string_to_lower(char *s);
 
 char *string_ucwords(char *s);
 
-char *string_replace_substring(const char *in,
-      const char *pattern, size_t pattern_len,
+char *string_replace_substring(
+      const char *in,          size_t in_len,
+      const char *pattern,     size_t pattern_len,
       const char *replacement, size_t replacement_len);
 
 /**
@@ -250,7 +251,7 @@ size_t word_wrap_wideglyph(
 /**
  * string_tokenize:
  *
- * Splits string into tokens seperated by @delim
+ * Splits string into tokens separated by @delim
  * > Returned token string must be free()'d
  * > Returns NULL if token is not found
  * > After each call, @str is set to the position after the
@@ -313,10 +314,6 @@ unsigned string_to_unsigned(const char *str);
  * @return 0 if string is invalid, otherwise > 0
  **/
 unsigned string_hex_to_unsigned(const char *str);
-
-char *string_init(const char *src);
-
-void string_set(char **string, const char *src);
 
 /**
  * string_count_occurrences_single_character:

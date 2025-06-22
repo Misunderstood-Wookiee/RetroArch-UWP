@@ -142,8 +142,10 @@ static void power_callback(void)
 }
 #endif
 
-static void reset_cb(void)
+static void reset_cb(unsigned int a, void *b)
 {
+   (void)a;
+   (void)b;
    g_menu = true;
 }
 
@@ -672,8 +674,10 @@ input_device_driver_t gx_joypad = {
    gx_joypad_get_buttons,
    gx_joypad_axis,
    gx_joypad_poll,
-   NULL,
-   NULL,
+   NULL, /* set_rumble */
+   NULL, /* set_rumble_gain */
+   NULL, /* set_sensor_state */
+   NULL, /* get_sensor_input */
    gx_joypad_name,
    "gx",
 };

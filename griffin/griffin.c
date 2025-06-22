@@ -197,7 +197,6 @@ ACHIEVEMENTS
 #define RC_CLIENT_SUPPORTS_HASH 1
 
 #include "../libretro-common/formats/cdfs/cdfs.c"
-#include "../network/net_http_special.c"
 
 #include "../cheevos/cheevos.c"
 #include "../cheevos/cheevos_client.c"
@@ -233,7 +232,9 @@ ACHIEVEMENTS
 /*============================================================
 MD5
 ============================================================ */
+#ifndef __APPLE__
 #include "../libretro-common/utils/md5.c"
+#endif
 
 /*============================================================
 CHEATS
@@ -269,7 +270,7 @@ VIDEO CONTEXT
 #include "../gfx/drivers_context/w_vk_ctx.c"
 #endif
 
-#if !defined(__WINRT__) 
+#if !defined(__WINRT__)
 #include "../gfx/display_servers/dispserv_win32.c"
 #endif
 
@@ -733,6 +734,7 @@ INPUT
 
 #ifdef HAVE_TEST_DRIVERS
 #include "../input/drivers_joypad/test_joypad.c"
+#include "../input/drivers/test_input.c"
 #endif
 
 /*============================================================
@@ -811,6 +813,13 @@ CAMERA
 #ifdef HAVE_V4L2
 #include "../camera/drivers/video4linux2.c"
 #endif
+#ifdef HAVE_PIPEWIRE
+#include "../camera/drivers/pipewire.c"
+#endif
+
+#ifdef HAVE_FFMPEG
+#include "../camera/drivers/ffmpeg.c"
+#endif
 
 #ifdef HAVE_VIDEOPROCESSOR
 #include "../cores/libretro-video-processor/video_processor_v4l2.c"
@@ -850,9 +859,6 @@ RSOUND
 AUDIO
 ============================================================ */
 #include "../audio/audio_driver.c"
-#ifdef HAVE_MICROPHONE
-#include "../audio/microphone_driver.c"
-#endif
 #if defined(__PS3__) || defined (__PSL1GHT__)
 #include "../audio/drivers/ps3_audio.c"
 #elif defined(XENON)
@@ -861,7 +867,7 @@ AUDIO
 #include "../audio/drivers/gx_audio.c"
 #elif defined(__wiiu__)
 #include "../audio/drivers/wiiu_audio.c"
-#elif defined(EMSCRIPTEN)
+#elif defined(HAVE_RWEBAUDIO)
 #include "../audio/drivers/rwebaudio.c"
 #elif defined(PSP) || defined(VITA) || defined(ORBIS)
 #include "../audio/drivers/psp_audio.c"
@@ -881,6 +887,9 @@ AUDIO
 
 #if defined(HAVE_SDL2)
 #include "../audio/drivers/sdl_audio.c"
+#include "../input/drivers/sdl_input.c"
+#include "../input/drivers_joypad/sdl_joypad.c"
+#include "../gfx/drivers_context/sdl_gl_ctx.c"
 #ifdef HAVE_MICROPHONE
 #include "../audio/drivers_microphone/sdl_microphone.c"
 #endif
@@ -901,6 +910,15 @@ AUDIO
 
 #ifdef HAVE_SL
 #include "../audio/drivers/opensl.c"
+#endif
+
+#ifdef HAVE_PIPEWIRE
+#include "../audio/drivers/pipewire.c"
+#include "../audio/common/pipewire.c"
+
+#ifdef HAVE_MICROPHONE
+#include "../audio/drivers_microphone/pipewire.c"
+#endif
 #endif
 
 #ifdef HAVE_ALSA
@@ -944,6 +962,10 @@ MIDI
 ============================================================ */
 #ifdef HAVE_WINMM
 #include "../midi/drivers/winmm_midi.c"
+#endif
+
+#ifdef HAVE_COREMIDI
+#include "../midi/drivers/coremidi.c"
 #endif
 
 /*============================================================
@@ -995,6 +1017,7 @@ FILTERS
 #include "../gfx/video_filters/dot_matrix_3x.c"
 #include "../gfx/video_filters/dot_matrix_4x.c"
 #include "../gfx/video_filters/upscale_1_5x.c"
+#include "../gfx/video_filters/upscale_1_66x_fast.c"
 #include "../gfx/video_filters/upscale_256x_320x240.c"
 #include "../gfx/video_filters/picoscale_256x_320x240.c"
 #include "../gfx/video_filters/upscale_240x160_320x240.c"
@@ -1002,13 +1025,16 @@ FILTERS
 #endif
 
 #ifdef HAVE_DSP_FILTER
+#include "../libretro-common/audio/dsp_filters/chorus.c"
+#include "../libretro-common/audio/dsp_filters/crystalizer.c"
 #include "../libretro-common/audio/dsp_filters/echo.c"
 #include "../libretro-common/audio/dsp_filters/eq.c"
-#include "../libretro-common/audio/dsp_filters/chorus.c"
 #include "../libretro-common/audio/dsp_filters/iir.c"
 #include "../libretro-common/audio/dsp_filters/panning.c"
 #include "../libretro-common/audio/dsp_filters/phaser.c"
 #include "../libretro-common/audio/dsp_filters/reverb.c"
+#include "../libretro-common/audio/dsp_filters/tremolo.c"
+#include "../libretro-common/audio/dsp_filters/vibrato.c"
 #include "../libretro-common/audio/dsp_filters/wahwah.c"
 #endif
 #endif
@@ -1213,6 +1239,7 @@ WIFI
 RECORDING
 ============================================================ */
 #include "../record/record_driver.c"
+#include "../record/drivers/record_wav.c"
 #ifdef HAVE_FFMPEG
 #include "../record/drivers/record_ffmpeg.c"
 #endif
@@ -1635,6 +1662,16 @@ ANDROID PLAY FEATURE DELIVERY
 #include "../play_feature_delivery/play_feature_delivery.c"
 #endif
 
+
+/*============================================================
+FFMPEG
+============================================================ */
+#ifdef HAVE_FFMPEG
+#include "../cores/libretro-ffmpeg/packet_buffer.c"
+#include "../cores/libretro-ffmpeg/video_buffer.c"
+#include "../libretro-common/rthreads/tpool.c"
+#endif
+
 /*============================================================
 STEAM INTEGRATION USING MIST
 ============================================================ */
@@ -1654,4 +1691,11 @@ CLOUD SYNC
 #include "../tasks/task_cloudsync.c"
 #include "../network/cloud_sync_driver.c"
 #include "../network/cloud_sync/webdav.c"
+#endif
+
+/*============================================================
+GAME AI
+============================================================ */
+#if defined(HAVE_GAME_AI)
+#include "../ai/game_ai.c"
 #endif

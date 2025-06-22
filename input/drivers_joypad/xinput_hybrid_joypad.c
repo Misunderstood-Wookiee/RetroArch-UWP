@@ -16,14 +16,14 @@
 
 /* Support 360 controllers on Windows.
  * Said controllers do show under DInput but they have limitations in this mode;
- * The triggers are combined rather than seperate and it is not possible to use
+ * The triggers are combined rather than separate and it is not possible to use
  * the guide button.
  *
  * Some wrappers for other controllers also simulate xinput (as it is easier to implement)
  * so this may be useful for those also.
  **/
 
-/* Specialized version of xinput_joypad.c, 
+/* Specialized version of xinput_joypad.c,
  * has both DirectInput and XInput codepaths */
 
 /* TODO/FIXME - integrate dinput_joypad into this version */
@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <time.h>
 
 #include <boolean.h>
 #include <retro_inline.h>
@@ -68,6 +69,8 @@ typedef struct
    bool         connected;
 } xinput_joypad_state;
 
+#define RUMBLE_INTERVAL 0.005
+
 /* TODO/FIXME - static globals */
 static int g_xinput_pad_indexes[MAX_USERS];
 static unsigned g_last_xinput_pad_idx       = 0;
@@ -90,11 +93,16 @@ static XINPUT_FEEDBACK     g_xinput_rumble_states[4];
 static XINPUT_VIBRATION    g_xinput_rumble_states[4];
 #endif
 static xinput_joypad_state g_xinput_states[4];
+static bool xinput_active_port[4] = {0};
+static clock_t last_rumble_time[4] = {0};
+
+static unsigned xinput_hotplug_index = 0;
+static unsigned xinput_poll_counter = 0;
 
 /* Buttons are provided by XInput as bits of a uint16.
- * Map from rarch button index (0..10) to a mask to 
+ * Map from rarch button index (0..10) to a mask to
  * bitwise-& the buttons against.
- * dpad is handled seperately. */
+ * dpad is handled separately. */
 static const uint16_t button_index_to_bitmap_code[] =  {
    XINPUT_GAMEPAD_A,
    XINPUT_GAMEPAD_B,
@@ -170,7 +178,7 @@ static bool guid_is_xinput_device(const GUID* product_guid)
 
       rdi.cbSize      = rdi_size;
 
-      /* 
+      /*
        * Step 1 -
        * Check if device type is HID
        * Step 2 -
@@ -182,7 +190,7 @@ static bool guid_is_xinput_device(const GUID* product_guid)
        * Step 5 -
        * Check if the device ID contains "IG_".
        * If it does, then it's an XInput device
-       * This information can not be found from DirectInput 
+       * This information can not be found from DirectInput
        */
       if (
                (raw_devs[i].dwType == RIM_TYPEHID)                    /* 1 */
@@ -242,7 +250,7 @@ static BOOL CALLBACK enum_joypad_cb_hybrid(
    if (g_joypad_cnt == MAX_USERS)
       return DIENUM_STOP;
 
-   while (!g_xinput_states[g_last_xinput_pad_idx].connected && g_last_xinput_pad_idx < 3) 
+   while (!g_xinput_states[g_last_xinput_pad_idx].connected && g_last_xinput_pad_idx < 3)
    {
       g_last_xinput_pad_idx++;
    }
@@ -258,9 +266,9 @@ static BOOL CALLBACK enum_joypad_cb_hybrid(
 #endif
       return DIENUM_CONTINUE;
 
-   g_pads[g_joypad_cnt].joy_name          = 
+   g_pads[g_joypad_cnt].joy_name          =
       strdup((const char*)inst->tszProductName);
-   g_pads[g_joypad_cnt].joy_friendly_name = 
+   g_pads[g_joypad_cnt].joy_friendly_name =
       strdup((const char*)inst->tszInstanceName);
 
    /* there may be more useful info in the GUID,
@@ -420,9 +428,12 @@ static void *xinput_joypad_init(void *data)
       g_xinput_states[i].xstate.Gamepad.sThumbLY      = 0;
       g_xinput_states[i].xstate.Gamepad.sThumbRX      = 0;
       g_xinput_states[i].xstate.Gamepad.sThumbRY      = 0;
-      g_xinput_states[i].connected                    = 
+      g_xinput_states[i].connected                    =
          !(g_XInputGetStateEx(i, &dummy_state) == ERROR_DEVICE_NOT_CONNECTED);
    }
+
+   for (i = 0; i < 4; ++i)
+      xinput_active_port[i] = false;
 
    if (  (!g_xinput_states[0].connected) &&
          (!g_xinput_states[1].connected) &&
@@ -457,7 +468,10 @@ static void *xinput_joypad_init(void *data)
          int32_t dinput_index = 0;
          bool success         = dinput_joypad_get_vidpid_from_xinput_index((int32_t)PAD_INDEX_TO_XUSER_INDEX(j), (int32_t*)&vid, (int32_t*)&pid,
 			 (int32_t*)&dinput_index);
+
          /* On success, found VID/PID from dinput index */
+         if (!success)
+            continue;
 
          input_autoconfigure_connect(
                name,
@@ -467,6 +481,13 @@ static void *xinput_joypad_init(void *data)
                vid,
                pid);
       }
+   }
+
+   for (i = 0; i < MAX_USERS; ++i)
+   {
+      int xuser = PAD_INDEX_TO_XUSER_INDEX(i);
+      if (xuser >= 0 && xuser < 4)
+         xinput_active_port[xuser] = true;
    }
 
 #ifdef __WINRT__
@@ -480,7 +501,7 @@ succeeded:
 error:
    /* non-hat button. */
    g_xinput_num_buttons = g_xinput_guide_button_supported ? 11 : 10;
-   
+
    return NULL;
 }
 
@@ -543,12 +564,12 @@ static int16_t xinput_joypad_state_func(
       const uint32_t joyaxis = (binds[i].joyaxis != AXIS_NONE)
          ? binds[i].joyaxis : joypad_info->auto_binds[i].joyaxis;
       if (
-               (uint16_t)joykey != NO_BTN 
+               (uint16_t)joykey != NO_BTN
             && xinput_joypad_button_state(
                xuser, btn_word, port_idx, (uint16_t)joykey))
          ret |= ( 1 << i);
       else if (joyaxis != AXIS_NONE &&
-            ((float)abs(xinput_joypad_axis_state(pad, port_idx, joyaxis)) 
+            ((float)abs(xinput_joypad_axis_state(pad, port_idx, joyaxis))
              / 0x8000) > joypad_info->axis_threshold)
          ret |= (1 << i);
    }
@@ -558,14 +579,48 @@ static int16_t xinput_joypad_state_func(
 
 static void xinput_joypad_poll(void)
 {
-   unsigned i;
+   int i;
+   /* Hotplugging detection: scanning one port at a time every few frames,
+    * to avoid polling overload and framerate drops. */
+   xinput_poll_counter++;
+   if (xinput_poll_counter >= 15)
+   {
+      xinput_poll_counter = 0;
+      if (!xinput_active_port[xinput_hotplug_index])
+      {
+         XINPUT_STATE tmp_state;
+         DWORD result = g_XInputGetStateEx(xinput_hotplug_index, &tmp_state);
+         if (result == ERROR_SUCCESS)
+         {
+            const char *name = xinput_joypad_name(xinput_hotplug_index);
+            int32_t vid = 0;
+            int32_t pid = 0;
+            input_autoconfigure_connect(
+               name,
+               NULL,
+               xinput_joypad.ident,
+               xinput_hotplug_index,
+               vid,
+               pid);
+
+            xinput_active_port[xinput_hotplug_index] = true;
+         }
+      }
+         xinput_hotplug_index = (xinput_hotplug_index + 1) % 4;
+   }
 
    for (i = 0; i < 4; ++i)
    {
-      xinput_joypad_state *state = &g_xinput_states[i];
-      DWORD status               = g_XInputGetStateEx(i, &state->xstate);
-      bool success               = (status == ERROR_SUCCESS);
-      bool new_connected         = (status != ERROR_DEVICE_NOT_CONNECTED);
+      DWORD status;
+      bool success, new_connected;
+      xinput_joypad_state *state;
+      if (!xinput_active_port[i])
+         continue;
+
+      state         = &g_xinput_states[i];
+      status        = g_XInputGetStateEx(i, &state->xstate);
+      success       = (status == ERROR_SUCCESS);
+      new_connected = (status != ERROR_DEVICE_NOT_CONNECTED);
       if (new_connected != state->connected)
       {
          state->connected = new_connected;
@@ -641,22 +696,43 @@ static void xinput_joypad_poll(void)
 static bool xinput_joypad_rumble(unsigned pad,
       enum retro_rumble_effect effect, uint16_t strength)
 {
+   clock_t now;
+   double time_since_last_rumble;
+   XINPUT_VIBRATION new_state, *state;
    int xuser = PAD_INDEX_TO_XUSER_INDEX(pad);
 
    if (xuser == -1)
       return dinput_joypad_set_rumble(pad, effect, strength);
 
+   state          = &g_xinput_rumble_states[xuser];
+   new_state      = *state;
+
    /* Consider the low frequency (left) motor the "strong" one. */
    if (effect == RETRO_RUMBLE_STRONG)
-      g_xinput_rumble_states[xuser].wLeftMotorSpeed  = strength;
+      new_state.wLeftMotorSpeed  = strength;
    else if (effect == RETRO_RUMBLE_WEAK)
-      g_xinput_rumble_states[xuser].wRightMotorSpeed = strength;
+      new_state.wRightMotorSpeed = strength;
 
-   if (!g_XInputSetState)
-      return false;
+   /* Rumble state unchanged? */
+   if (   (new_state.wLeftMotorSpeed  == state->wLeftMotorSpeed)
+       && (new_state.wRightMotorSpeed == state->wRightMotorSpeed))
+      return true;
 
-   return (g_XInputSetState(xuser, &g_xinput_rumble_states[xuser])
-      == 0);
+   now                           = clock();
+   time_since_last_rumble        = (double)(now - last_rumble_time[xuser]) / CLOCKS_PER_SEC;
+
+   /* Rumble interval unelapsed? */
+   if (time_since_last_rumble < RUMBLE_INTERVAL)
+      return true;
+
+   if (g_XInputSetState)
+   {
+      *state                  = new_state;
+      last_rumble_time[xuser] = now;
+      if (g_XInputSetState(xuser, state) == ERROR_SUCCESS)
+         return true;
+   }
+   return false;
 }
 
 static void xinput_joypad_destroy(void)
@@ -699,7 +775,9 @@ input_device_driver_t xinput_joypad = {
    xinput_joypad_axis,
    xinput_joypad_poll,
    xinput_joypad_rumble,
-   NULL,
+   NULL, /* set_rumble_gain */
+   NULL, /* set_sensor_state */
+   NULL, /* get_sensor_input */
    xinput_joypad_name,
    "xinput",
 };

@@ -23,7 +23,6 @@
 #include <libretro.h>
 #include <math.h>
 
-#include "../retroarch.h"
 #include <retro_common_api.h>
 #include "video_crt_switch.h"
 #include "video_display_server.h"
@@ -46,7 +45,10 @@ static void crt_adjust_sr_ini(videocrt_switch_t *p_switch);
 /* Global local variables */
 static bool ini_overrides_loaded = false;
 static char core_name[NAME_MAX_LENGTH]; /* Same size as library_name on retroarch_data.h */
-static char content_dir[PATH_MAX_LENGTH];
+static char content_dir[DIR_MAX_LENGTH];
+static char _hSize[12];
+static char _hShift[12];
+static char _vShift[12];
 
 #if defined(HAVE_VIDEOCORE) /* Need to add video core to SR2 */
 #include "include/userland/interface/vmcs_host/vc_vchi_gencmd.h"
@@ -57,8 +59,9 @@ static bool crt_check_for_changes(videocrt_switch_t *p_switch)
 {
    if (   (p_switch->ra_core_height != p_switch->ra_tmp_height)
        || (p_switch->ra_core_width  != p_switch->ra_tmp_width)
-       || (p_switch->center_adjust  != p_switch->tmp_center_adjust
-       ||  p_switch->porch_adjust   != p_switch->tmp_porch_adjust)
+       || (p_switch->center_adjust  != p_switch->tmp_center_adjust)
+       || (p_switch->porch_adjust   != p_switch->tmp_porch_adjust)
+       || (p_switch->vert_adjust   != p_switch->tmp_vert_adjust)
        || (p_switch->ra_core_hz     != p_switch->ra_tmp_core_hz)
        || (p_switch->rotated        != p_switch->tmp_rotated))
       return true;
@@ -73,20 +76,21 @@ static void crt_store_temp_changes(videocrt_switch_t *p_switch)
    p_switch->tmp_porch_adjust  = p_switch->porch_adjust;
    p_switch->ra_tmp_core_hz    = p_switch->ra_core_hz;
    p_switch->tmp_rotated       = p_switch->rotated;
+   p_switch->tmp_vert_adjust   = p_switch->vert_adjust;
 }
 
 static void crt_aspect_ratio_switch(
       videocrt_switch_t *p_switch,
       unsigned width, unsigned height,
-      float srm_width, float srm_height)
+      float srm_width, float srm_height,
+      unsigned video_aspect_ratio_idx)
 {
-   settings_t *settings           = config_get_ptr();
    float fly_aspect               = (float)width / (float)height;
    p_switch->fly_aspect           = fly_aspect;
    video_driver_state_t *video_st = video_state_get_ptr();
 
    /* We only force aspect ratio for the core provided setting */
-   if (settings->uints.video_aspect_ratio_idx != ASPECT_RATIO_CORE)
+   if (video_aspect_ratio_idx != ASPECT_RATIO_CORE)
    {
       RARCH_LOG("[CRT]: Aspect ratio forced by user: %f\n", video_st->aspect_ratio);
       return;
@@ -133,25 +137,27 @@ static void crt_switch_set_aspect(
       patched_height           = height;
    }
 
+#if !defined(HAVE_VIDEOCORE)
    sr_get_state(&state);
 
    if ((int)srm_width >= state.super_width && !srm_isstretched)
       RARCH_LOG("[CRT]: Super resolution detected. Fractal scaling @ X:%f Y:%f \n", srm_xscale, srm_yscale);
    else if (srm_isstretched && srm_width > 0 )
       RARCH_LOG("[CRT]: Resolution is stretched. Fractal scaling @ X:%f Y:%f \n", srm_xscale, srm_yscale);
+#endif
 
    scaled_width  = roundf(patched_width  * srm_xscale);
    scaled_height = roundf(patched_height * srm_yscale);
 
-   crt_aspect_ratio_switch(p_switch, scaled_width, scaled_height, srm_width, srm_height);
+   crt_aspect_ratio_switch(p_switch, scaled_width, scaled_height,
+         srm_width, srm_height,
+         config_get_ptr()->uints.video_aspect_ratio_idx);
 }
 
 #if !defined(HAVE_VIDEOCORE)
 static bool crt_sr2_init(videocrt_switch_t *p_switch,
       int monitor_index, unsigned int crt_mode, unsigned int super_width)
 {
-   char *mode;
-   const char *err_msg;
    char index[10];
    gfx_ctx_ident_t gfxctx;
    char ra_config_path[PATH_MAX_LENGTH];
@@ -289,18 +295,28 @@ static void switch_res_crt(
       unsigned crt_mode, unsigned native_width,
       int monitor_index, int super_width)
 {
-   char current_core_name[NAME_MAX_LENGTH];
-   char current_content_dir[PATH_MAX_LENGTH];
-   int flags = 0,   ret;
-   const char *err_msg     = NULL;
    int w                   = native_width;
    int h                   = height;
-   double rr               = p_switch->ra_core_hz;
 
    /* Check if SR2 is loaded, if not, load it */
    if (crt_sr2_init(p_switch, monitor_index, crt_mode, super_width))
    {
+      int ret;
+      int flags = 0;
+      int temph = 640;
+      int tempw = 480;
+      char current_core_name[NAME_MAX_LENGTH];
+      char current_content_dir[DIR_MAX_LENGTH];
+      double rr              = p_switch->ra_core_hz;
       const char *_core_name = (const char*)runloop_state_get_ptr()->system.info.library_name;
+      
+      const char* hSize = (const char*)_hSize;
+      const char* hShift = (const char*)_hShift;
+      const char* vShift = (const char*)_vShift;
+
+      if (p_switch->rotated)
+         flags |= SR_MODE_ROTATED;
+      
       /* Check for core and content changes in case we need
          to make any adjustments */
       if (string_is_empty(_core_name))
@@ -324,8 +340,37 @@ static void switch_res_crt(
          p_switch->hh_core = false;
       }
 
-      if (p_switch->rotated)
-         flags |= SR_MODE_ROTATED;
+      #if defined(_WIN32)
+      if (p_switch->center_adjust  != p_switch->tmp_center_adjust ||
+         p_switch->vert_adjust   != p_switch->tmp_vert_adjust)
+      {
+
+         if (w > 320 || h > 240)
+         {
+            temph = 240;
+            tempw = 320;
+            RARCH_LOG("[CRT]: SR temporary mode for windows geometry adjustment (320x240)\n");
+         }else{
+
+            RARCH_LOG("[CRT]: SR temporary mode for windows geometry adjustment (640x400)\n");
+         }
+   
+         ret = sr_add_mode(tempw, temph, rr, flags, &srm);
+
+         if (!ret)
+            RARCH_ERR("[CRT]: SR failed to add temporary mode for windows geometry adjustment\n");
+         else
+         {
+            ret = sr_set_mode(srm.id);
+            RARCH_LOG("[CRT]: SR added temporary mode for windows geometry adjustment\n");
+         }
+           
+      }
+      #endif
+
+      sr_set_option(SR_OPT_H_SIZE, hSize);
+      sr_set_option(SR_OPT_H_SHIFT, hShift);
+      sr_set_option(SR_OPT_V_SHIFT, vShift);
 
       RARCH_DBG("%dx%d rotation: %d rotated: %d core rotation:%d\n", w, h, p_switch->rotated, flags & SR_MODE_ROTATED, retroarch_get_rotation());
       ret = sr_add_mode(w, h, rr, flags, &srm);
@@ -382,9 +427,12 @@ void crt_switch_res_core(
       int crt_switch_center_adjust,
       int crt_switch_porch_adjust,
       int monitor_index, bool dynamic,
-      int super_width, bool hires_menu)
+      int super_width, bool hires_menu,
+      unsigned video_aspect_ratio_idx,
+      int crt_switch_vert_adjust)
 {
-   settings_t *settings  = config_get_ptr();
+   
+
    if (height <= 4)
    {
       hz              = 60;
@@ -397,7 +445,7 @@ void crt_switch_res_core(
       {
          native_width = 320;
          height       = 240;
-      }
+      } 
       width           = native_width;
    }
 
@@ -405,6 +453,7 @@ void crt_switch_res_core(
    {
       p_switch->menu_active           = false;
       p_switch->porch_adjust          = crt_switch_porch_adjust;
+      p_switch->vert_adjust           = crt_switch_vert_adjust;
       p_switch->ra_core_height        = height;
       p_switch->ra_core_hz            = hz;
 
@@ -422,7 +471,13 @@ void crt_switch_res_core(
 #if defined(HAVE_VIDEOCORE)
          crt_rpi_switch(p_switch, width, height, hz, 0, native_width);
 #else
-
+         
+         sprintf(_hSize, "%lf", 1+
+            ((float)crt_switch_porch_adjust/100.0));
+         sprintf(_hShift, "%d",
+            crt_switch_center_adjust);
+         sprintf(_vShift, "%d",
+            crt_switch_vert_adjust);
          if (p_switch->hh_core)
          {
             int corrected_width  = 320;
@@ -442,8 +497,8 @@ void crt_switch_res_core(
          crt_store_temp_changes(p_switch);
       }
 
-      if (  (settings->uints.video_aspect_ratio_idx == ASPECT_RATIO_CORE)
-         && video_driver_get_aspect_ratio() != p_switch->fly_aspect)
+      if (  (video_aspect_ratio_idx == ASPECT_RATIO_CORE)
+         &&  video_driver_get_aspect_ratio() != p_switch->fly_aspect)
       {
          video_driver_state_t *video_st = video_state_get_ptr();
          float fly_aspect               = (float)p_switch->fly_aspect;
@@ -456,7 +511,7 @@ void crt_switch_res_core(
 
 void crt_adjust_sr_ini(videocrt_switch_t *p_switch)
 {
-   char config_directory[PATH_MAX_LENGTH];
+   char config_directory[DIR_MAX_LENGTH];
    char switchres_ini_override_file[PATH_MAX_LENGTH];
 
    if (p_switch->sr2_active)
@@ -556,7 +611,8 @@ static void crt_rpi_switch(videocrt_switch_t *p_switch,
 
    width = w;
 
-   crt_aspect_ratio_switch(p_switch, width,height,width,height);
+   crt_aspect_ratio_switch(p_switch, width, height, width, height,
+         config_get_ptr()->uints.video_aspect_ratio_idx);
 
    /* following code is the mode line generator */
    hfp      = ((width * 0.044f) + (width / 112));

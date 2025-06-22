@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mach/task.h>
+#include <mach/mach_init.h>
+#include <mach/mach_port.h>
+
 #include <boolean.h>
 #include <file/file_path.h>
 #include <string/stdstring.h>
@@ -428,6 +432,9 @@ static ui_application_t ui_application_cocoa = {
 
             apple_input_keyboard_event(event_type == NSEventTypeKeyDown,
                   keycode, character, mod, RETRO_DEVICE_KEYBOARD);
+            if ((mod & RETROKMOD_META) && (event_type == NSEventTypeKeyDown))
+               apple_input_keyboard_event(false,
+                     keycode, character, mod, RETRO_DEVICE_KEYBOARD);
          }
          break;
 #if defined(HAVE_COCOA_METAL)
@@ -455,7 +462,7 @@ static ui_application_t ui_application_cocoa = {
             CGFloat delta_x             = event.deltaX;
             CGFloat delta_y             = event.deltaY;
             NSPoint pos                 = CONVERT_POINT();
-            cocoa_input_data_t 
+            cocoa_input_data_t
                *apple                   = (cocoa_input_data_t*)
                input_state_get_ptr()->current_data;
             if (!apple)
@@ -468,10 +475,13 @@ static ui_application_t ui_application_cocoa = {
             apple->touches[0].screen_x  = (int16_t)pos.x;
             apple->touches[0].screen_y  = (int16_t)pos.y;
 
-            if (apple->mouse_grabbed) {
+            if (apple->mouse_grabbed)
+            {
                apple->window_pos_x      += (int16_t)delta_x;
                apple->window_pos_y      += (int16_t)delta_y;
-            } else {
+            }
+            else
+            {
                apple->window_pos_x       = (int16_t)pos.x;
                apple->window_pos_y       = (int16_t)pos.y;
             }
@@ -490,7 +500,7 @@ static ui_application_t ui_application_cocoa = {
        {
            NSInteger number      = event.buttonNumber;
            NSPoint pos           = CONVERT_POINT();
-           cocoa_input_data_t 
+           cocoa_input_data_t
               *apple             = (cocoa_input_data_t*)
               input_state_get_ptr()->current_data;
            if (!apple || pos.y < 0)
@@ -505,7 +515,7 @@ static ui_application_t ui_application_cocoa = {
          {
             NSInteger number      = event.buttonNumber;
             NSPoint pos           = CONVERT_POINT();
-            cocoa_input_data_t 
+            cocoa_input_data_t
               *apple              = (cocoa_input_data_t*)
               input_state_get_ptr()->current_data;
             if (!apple || pos.y < 0)
@@ -533,7 +543,9 @@ static ui_application_t ui_application_cocoa = {
 
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
-    [apple_platform updateWindowedMode];
+   settings_t *settings             = config_get_ptr();
+   video_display_server_set_window_opacity(settings->uints.video_window_opacity);
+   video_display_server_set_window_decorations(settings->bools.video_window_show_decorations);
 }
 
 - (void)windowDidMove:(NSNotification *)notification
@@ -634,7 +646,13 @@ static ui_application_t ui_application_cocoa = {
    [self setupMainWindow];
 #endif
 
+#ifdef HAVE_QT
+   /* I think the draw observer should be absolutely fine for qt but I'm not testing it;
+    * whoever does test it and confirm it works can just delete this */
    [self performSelectorOnMainThread:@selector(rarch_main) withObject:nil waitUntilDone:NO];
+#else
+   rarch_start_draw_observer();
+#endif
 }
 
 #pragma mark - ApplePlatform
@@ -665,6 +683,16 @@ static ui_application_t ui_application_cocoa = {
    switch (vt)
    {
       case APPLE_VIEW_TYPE_VULKAN:
+         {
+            _renderView                 = [CocoaView get];
+            CAMetalLayer *metal_layer   = [[CAMetalLayer alloc] init];
+            metal_layer.device          = MTLCreateSystemDefaultDevice();
+            metal_layer.framebufferOnly = YES;
+            metal_layer.contentsScale   = [[NSScreen mainScreen] backingScaleFactor];
+            _renderView.layer           = metal_layer;
+            [_renderView setWantsLayer:YES];
+         }
+         break;
       case APPLE_VIEW_TYPE_METAL:
          {
             MetalView *v            = [MetalView new];
@@ -694,7 +722,7 @@ static ui_application_t ui_application_cocoa = {
 
 - (void)setVideoMode:(gfx_ctx_mode_t)mode
 {
-   BOOL is_fullscreen = (self.window.styleMask 
+   BOOL is_fullscreen = (self.window.styleMask
          & NSWindowStyleMaskFullScreen) == NSWindowStyleMaskFullScreen;
    if (mode.fullscreen)
    {
@@ -710,7 +738,6 @@ static ui_application_t ui_application_cocoa = {
       if (is_fullscreen)
          [self.window toggleFullScreen:self];
       [self updateWindowedSize:mode];
-      [self updateWindowedMode];
    }
 
    /* HACK(sgc): ensure MTKView posts a drawable resize event */
@@ -744,24 +771,6 @@ static ui_application_t ui_application_cocoa = {
       [self.window setContentSize:NSMakeSize(mode.width, mode.height)];
 }
 
-- (void)updateWindowedMode
-{
-   settings_t *settings      = config_get_ptr();
-   bool windowed_full        = settings->bools.video_windowed_fullscreen;
-   bool show_decorations     = settings->bools.video_window_show_decorations;
-   CGFloat opacity           = (CGFloat)settings->uints.video_window_opacity / (CGFloat)100.0;
-
-   if (windowed_full || !self.window.keyWindow)
-       return;
-
-   if (show_decorations)
-       self.window.styleMask |= NSWindowStyleMaskTitled;
-   else
-       self.window.styleMask &= ~NSWindowStyleMaskTitled;
-
-   self.window.alphaValue = opacity;
-}
-
 - (void)setCursorVisible:(bool)v
 {
    if (v)
@@ -789,6 +798,7 @@ static ui_application_t ui_application_cocoa = {
 }
 #endif
 
+#ifdef HAVE_QT
 - (void) rarch_main
 {
     for (;;)
@@ -810,7 +820,7 @@ static ui_application_t ui_application_cocoa = {
        steam_poll();
 #endif
 
-       while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.002, FALSE) 
+       while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.002, FALSE)
              == kCFRunLoopRunHandledSource);
        if (ret == -1)
        {
@@ -823,19 +833,21 @@ static ui_application_t ui_application_cocoa = {
 
     main_exit(NULL);
 }
+#endif
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification  { }
-- (void)applicationWillResignActive:(NSNotification *)notification { }
+- (void)applicationWillResignActive:(NSNotification *)notification
+{
+   apple_input_keyboard_reset();
+}
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)theApplication { return YES; }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
    NSApplicationTerminateReply reply = NSTerminateNow;
-   uint32_t runloop_flags            = runloop_get_flags();
-
-   if (runloop_flags & RUNLOOP_FLAG_IS_INITED)
-      reply = NSTerminateCancel;
 
    command_event(CMD_EVENT_QUIT, NULL);
+
+   rarch_stop_draw_observer();
 
    return reply;
 }
@@ -864,7 +876,7 @@ static ui_application_t ui_application_cocoa = {
    }
    else
    {
-      const ui_msg_window_t *msg_window = 
+      const ui_msg_window_t *msg_window =
          ui_companion_driver_get_msg_window_ptr();
       if (msg_window)
       {
@@ -884,7 +896,7 @@ static void open_core_handler(ui_browser_window_state_t *state, bool result)
 {
    rarch_system_info_t *sys_info    = &runloop_state_get_ptr()->system;
    settings_t           *settings   = config_get_ptr();
-   bool set_supports_no_game_enable = 
+   bool set_supports_no_game_enable =
       settings->bools.set_supports_no_game_enable;
    if (!state || string_is_empty(state->result))
       return;
@@ -919,22 +931,29 @@ static void open_document_handler(
    if (!result)
       return;
 
-   path_set(RARCH_PATH_CONTENT, state->result);
-
-   if (core_name)
+   if (filebrowser_get_type() == FILEBROWSER_SCAN_FILE)
+      action_scan_file(state->result, NULL, 0, 0);
+   else
    {
-      content_ctx_info_t content_info = {0};
-      task_push_load_content_with_current_core_from_companion_ui(
-            NULL,
-            &content_info,
-            CORE_TYPE_PLAIN,
-            NULL, NULL);
+      path_set(RARCH_PATH_CONTENT, state->result);
+
+      if (!string_is_empty(core_name))
+      {
+         content_ctx_info_t content_info = {0};
+         task_push_load_content_with_current_core_from_companion_ui(
+                                                                    NULL,
+                                                                    &content_info,
+                                                                    CORE_TYPE_PLAIN,
+                                                                    NULL, NULL);
+      }
+      else
+         cocoa_file_load_with_detect_core(state->result);
    }
 }
 
 - (IBAction)openCore:(id)sender
 {
-   const ui_browser_window_t *browser = 
+   const ui_browser_window_t *browser =
       ui_companion_driver_get_browser_window_ptr();
 
    if (browser)
@@ -961,7 +980,7 @@ static void open_document_handler(
 
 - (void)openDocument:(id)sender
 {
-   const ui_browser_window_t *browser = 
+   const ui_browser_window_t *browser =
       ui_companion_driver_get_browser_window_ptr();
 
    if (browser)
@@ -1064,6 +1083,10 @@ static void open_document_handler(
 
 int main(int argc, char *argv[])
 {
+#ifndef NDEBUG
+   task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, MACH_PORT_NULL, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
+#endif
+
    if (argc == 2)
    {
        if (argv[1])

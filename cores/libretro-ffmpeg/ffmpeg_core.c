@@ -222,14 +222,14 @@ static void ass_msg_cb(int level, const char *fmt, va_list args, void *data)
 }
 #endif
 
-static void append_attachment(const uint8_t *data, size_t size)
+static void append_attachment(const uint8_t *data, size_t len)
 {
    attachments = (struct attachment*)av_realloc(
          attachments, (attachments_size + 1) * sizeof(*attachments));
 
-   attachments[attachments_size].data = (uint8_t*)av_malloc(size);
-   attachments[attachments_size].size = size;
-   memcpy(attachments[attachments_size].data, data, size);
+   attachments[attachments_size].data = (uint8_t*)av_malloc(len);
+   attachments[attachments_size].size = len;
+   memcpy(attachments[attachments_size].data, data, len);
 
    attachments_size++;
 }
@@ -368,7 +368,7 @@ void CORE_PREFIX(retro_reset)(void)
    reset_triggered = true;
 }
 
-static void print_ffmpeg_version()
+static void print_ffmpeg_version(void)
 {
    PRINT_VERSION(avformat)
    PRINT_VERSION(avcodec)
@@ -491,7 +491,7 @@ static void check_variables(bool firststart)
          }
          else
          {
-            sw_decoder_threads = strtoul(sw_threads_var.value, NULL, 0);
+            sw_decoder_threads = (unsigned)strtoul(sw_threads_var.value, NULL, 0);
          }
          /* Scale the sws threads based on core count but use at least 2 and at most 4 threads */
          sw_sws_threads = MIN(MAX(2, sw_decoder_threads / 2), 4);
@@ -615,7 +615,7 @@ void CORE_PREFIX(retro_run)(void)
    static bool last_l;
    static bool last_r;
    double min_pts;
-   int16_t audio_buffer[2048];
+   int16_t audio_buffer[media.sample_rate / 20];
    bool left, right, up, down, l, r;
    int16_t ret                  = 0;
    size_t to_read_frames        = 0;
@@ -877,7 +877,7 @@ void CORE_PREFIX(retro_run)(void)
          if (!temporal_interpolation)
             mix_factor = 1.0f;
 
-         glBindFramebuffer(GL_FRAMEBUFFER, hw_render.get_current_framebuffer());
+         glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)hw_render.get_current_framebuffer());
          glClearColor(0, 0, 0, 1);
          glClear(GL_COLOR_BUFFER_BIT);
          glViewport(0, 0, media.width, media.height);
@@ -982,7 +982,7 @@ void CORE_PREFIX(retro_run)(void)
 #if ENABLE_HW_ACCEL
 /*
  * Try to initialize a specific HW decoder defined by type.
- * Optionaly tests the pixel format list for a compatible pixel format.
+ * Optionally tests the pixel format list for a compatible pixel format.
  */
 static enum AVPixelFormat init_hw_decoder(struct AVCodecContext *ctx,
                                     const enum AVHWDeviceType type,
@@ -1330,7 +1330,7 @@ static bool init_media_info(void)
          media.duration.hours   = 0;
          media.duration.minutes = 0;
          media.duration.seconds = 0;
-         log_cb(RETRO_LOG_ERROR, "[FFMPEG] Could not determine media duration\n");
+         log_cb(RETRO_LOG_ERROR, "[FFMPEG] Could not determine media duration.\n");
       }
    }
 
@@ -1750,7 +1750,7 @@ static void decode_thread(void *data)
    if (video_stream_index >= 0)
    {
       frame_size = av_image_get_buffer_size(AV_PIX_FMT_RGB32, media.width, media.height, 1);
-      video_buffer = video_buffer_create(4, frame_size, media.width, media.height);
+      video_buffer = video_buffer_create(4, (int)frame_size, media.width, media.height);
       tpool = tpool_create(sw_sws_threads);
       log_cb(RETRO_LOG_INFO, "[FFMPEG] Configured worker threads: %d\n", sw_sws_threads);
    }
@@ -2161,7 +2161,7 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 
    if (!CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
-      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Cannot set pixel format.");
+      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Cannot set pixel format.\n");
       goto error;
    }
 
@@ -2192,13 +2192,13 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 
    if (!open_codecs())
    {
-      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Failed to find codec.");
+      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Failed to find codec.\n");
       goto error;
    }
 
    if (!init_media_info())
    {
-      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Failed to init media info.");
+      log_cb(RETRO_LOG_ERROR, "[FFMPEG] Failed to init media info.\n");
       goto error;
    }
 
@@ -2278,41 +2278,12 @@ size_t CORE_PREFIX(retro_serialize_size)(void)
    return 0;
 }
 
-bool CORE_PREFIX(retro_serialize)(void *data, size_t size)
-{
-   (void)data;
-   (void)size;
-   return false;
-}
-
-bool CORE_PREFIX(retro_unserialize)(const void *data, size_t size)
-{
-   (void)data;
-   (void)size;
-   return false;
-}
-
-void *CORE_PREFIX(retro_get_memory_data)(unsigned id)
-{
-   (void)id;
-   return NULL;
-}
-
-size_t CORE_PREFIX(retro_get_memory_size)(unsigned id)
-{
-   (void)id;
-   return 0;
-}
-
-void CORE_PREFIX(retro_cheat_reset)(void)
-{}
-
-void CORE_PREFIX(retro_cheat_set)(unsigned index, bool enabled, const char *code)
-{
-   (void)index;
-   (void)enabled;
-   (void)code;
-}
+bool CORE_PREFIX(retro_serialize)(void *data, size_t len) { return false; }
+bool CORE_PREFIX(retro_unserialize)(const void *data, size_t len) { return false; }
+void *CORE_PREFIX(retro_get_memory_data)(unsigned id) { return NULL; }
+size_t CORE_PREFIX(retro_get_memory_size)(unsigned id) { return 0; }
+void CORE_PREFIX(retro_cheat_reset)(void) { }
+void CORE_PREFIX(retro_cheat_set)(unsigned a, bool b, const char *c) { }
 
 #if defined(LIBRETRO_SWITCH)
 

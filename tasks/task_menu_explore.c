@@ -94,14 +94,14 @@ static void cb_task_menu_explore_init(
       const menu_ctx_driver_t *driver_ctx = menu_st->driver_ctx;
       if (driver_ctx->list_get_entry)
       {
-         size_t selection                 = driver_ctx->list_get_selection ? driver_ctx->list_get_selection(menu_st->userdata) : 0;
-         size_t size                      = driver_ctx->list_get_size      ? driver_ctx->list_get_size(menu_st->userdata, MENU_LIST_TABS) : 0;
-         if (selection > 0 && size > 0)
+         size_t selection = driver_ctx->list_get_selection ? driver_ctx->list_get_selection(menu_st->userdata) : 0;
+         size_t _len      = driver_ctx->list_get_size      ? driver_ctx->list_get_size(menu_st->userdata, MENU_LIST_TABS) : 0;
+         if (selection > 0 && _len > 0)
          {
             struct item_file *item        = NULL;
             /* Label contains the path and path contains the label */
             if ((item = (struct item_file*)driver_ctx->list_get_entry(menu_st->userdata, MENU_LIST_HORIZONTAL,
-                        (unsigned)(selection - (size +1)))))
+                        (unsigned)(selection - (_len +1)))))
                menu_type = item->type;
          }
       }
@@ -135,7 +135,9 @@ static void task_menu_explore_init_handler(retro_task_t *task)
       menu_explore_init_handle_t *menu_explore = NULL;
       if ((menu_explore = (menu_explore_init_handle_t*)task->state))
       {
-         if (!task_get_cancelled(task))
+         uint8_t flg = task_get_flags(task);
+
+         if (!((flg & RETRO_TASK_FLG_CANCELLED) > 0))
          {
             /* TODO/FIXME: It could be beneficial to
              * initialise the explore menu iteratively,
@@ -152,16 +154,13 @@ static void task_menu_explore_init_handler(retro_task_t *task)
          }
       }
 
-      task_set_finished(task, true);
+      task_set_flags(task, RETRO_TASK_FLG_FINISHED, true);
    }
 }
 
-static bool task_menu_explore_init_finder(
-      retro_task_t *task, void *user_data)
+static bool task_menu_explore_init_finder(retro_task_t *task, void *user_data)
 {
-   if (task && task->handler == task_menu_explore_init_handler)
-      return true;
-   return false;
+   return (task && task->handler == task_menu_explore_init_handler);
 }
 
 bool task_push_menu_explore_init(const char *directory_playlist,
@@ -200,11 +199,11 @@ bool task_push_menu_explore_init(const char *directory_playlist,
     *   and no user notification messages */
    task->handler  = task_menu_explore_init_handler;
    task->state    = menu_explore;
-   task->mute     = true;
    task->title    = NULL;
    task->progress = 0;
    task->callback = cb_task_menu_explore_init;
    task->cleanup  = task_menu_explore_init_free;
+   task->flags   |= RETRO_TASK_FLG_MUTE;
 
    task_queue_push(task);
 

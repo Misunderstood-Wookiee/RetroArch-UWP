@@ -18,6 +18,7 @@
 #define __COCOA_COMMON_SHARED_H
 
 #include <Foundation/Foundation.h>
+#include <QuartzCore/QuartzCore.h>
 
 #if defined(HAVE_COCOATOUCH)
 #include <UIKit/UIKit.h>
@@ -73,6 +74,8 @@
 @property(readwrite) UIInterfaceOrientation lockInterfaceOrientation;
 #endif
 
+@property(nonatomic,readwrite) CADisplayLink *displayLink;
+
 + (CocoaView*)get;
 @end
 
@@ -87,16 +90,12 @@ void get_ios_version(int *major, int *minor);
 - (void)display;
 #endif
 
-@end
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 140000
+@property(nonatomic,readwrite) CADisplayLink *displayLink API_AVAILABLE(macos(14.0));
 #endif
 
-typedef struct
-{
-   char orientations[32];
-   unsigned orientation_flags;
-   char bluetooth_mode[64];
-} apple_frontend_settings_t;
-extern apple_frontend_settings_t apple_frontend_settings;
+@end
+#endif
 
 #define BOXSTRING(x) [NSString stringWithUTF8String:x]
 #define BOXINT(x)    [NSNumber numberWithInt:x]

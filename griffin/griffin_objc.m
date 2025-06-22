@@ -27,9 +27,7 @@
 #define HAVE_COMPRESSION 1
 #endif
 
-#if defined(__APPLE__) && defined(__MACH__)
-#include "../frontend/drivers/platform_darwin.m"
-#endif
+#include "../gfx/display_servers/dispserv_apple.m"
 
 #if defined(HAVE_COCOATOUCH) || defined(HAVE_COCOA) || defined(HAVE_COCOA_METAL)
 
@@ -55,8 +53,24 @@
 #include "../input/drivers_joypad/mfi_joypad.m"
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include "../frontend/drivers/platform_darwin.m"
+#endif
+
 #ifdef HAVE_COREAUDIO3
 #include "../audio/drivers/coreaudio3.m"
+#endif
+
+#if defined(HAVE_COREAUDIO) && defined(HAVE_MICROPHONE)
+#include "../audio/drivers_microphone/coreaudio_mic.m"
+#endif
+
+#ifdef HAVE_CORELOCATION
+#include "../location/drivers/corelocation.m"
+#endif
+
+#ifdef HAVE_AVF
+#include "../camera/drivers/avfoundation.m"
 #endif
 
 #if defined(HAVE_DISCORD)
@@ -70,4 +84,12 @@
 
 #if defined(HAVE_NETWORKING) && defined(HAVE_NETPLAYDISCOVERY) && defined(HAVE_NETPLAYDISCOVERY_NSNET)
 #import "../network/netplay/netplay_nsnetservice.m"
+#endif
+
+#if defined(HAVE_CLOUDSYNC) && defined(HAVE_ICLOUD)
+#include "../network/cloud_sync/icloud.m"
+#endif
+
+#if defined(HAVE_CLOUDSYNC) && defined(HAVE_ICLOUD_DRIVE)
+#include "../network/cloud_sync/icloud_drive.m"
 #endif

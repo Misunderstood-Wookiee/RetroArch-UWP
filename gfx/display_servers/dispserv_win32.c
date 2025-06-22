@@ -15,6 +15,8 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define WIN32_LEAN_AND_MEAN
+
 /* VC6 needs objbase included before initguid, but nothing else does */
 #include <objbase.h>
 #include <initguid.h>
@@ -25,7 +27,7 @@
 #define COBJMACROS
 #define COBJMACROS_DEFINED
 #endif
-/* We really just want shobjidl.h, but there's no way to detect its existance at compile time (especially with mingw). however shlobj happens to include it for us when it's supported, which is easier. */
+/* We really just want shobjidl.h, but there's no way to detect its existence at compile time (especially with mingw). however shlobj happens to include it for us when it's supported, which is easier. */
 #include <shlobj.h>
 #ifdef COBJMACROS_DEFINED
 #undef COBJMACROS
@@ -124,7 +126,9 @@ static void win32_display_server_destroy(void *data)
    if (!dispserv)
       return;
 
-   if (dispserv->orig_width > 0 && dispserv->orig_height > 0)
+   if (     dispserv->orig_width > 0
+         && dispserv->orig_height > 0
+         && dispserv->orig_refresh > 0)
       video_display_server_set_resolution(
             dispserv->orig_width,
             dispserv->orig_height,
@@ -148,7 +152,6 @@ static bool win32_display_server_set_window_opacity(
 {
 #ifdef HAVE_WINDOW_TRANSP
    HWND              hwnd = win32_get_window();
-   dispserv_win32_t *serv = (dispserv_win32_t*)data;
    /* Set window transparency on Windows 2000 and above */
    if (opacity < 100)
    {
@@ -356,6 +359,7 @@ static void *win32_display_server_get_resolution_list(
 #if _WIN32_WINNT >= 0x0500
    unsigned curr_orientation         = 0;
 #endif
+   bool curr_interlaced              = false;
    struct video_display_config *conf = NULL;
 
    if (win32_get_video_output(&dm, -1, sizeof(dm)))
@@ -366,6 +370,7 @@ static void *win32_display_server_get_resolution_list(
       curr_refreshrate               = dm.dmDisplayFrequency;
 #if _WIN32_WINNT >= 0x0500
       curr_orientation               = dm.dmDisplayOrientation;
+      curr_interlaced                = (dm.dmDisplayFlags & DM_INTERLACED) ? true : false;
 #endif
    }
 
@@ -403,13 +408,22 @@ static void *win32_display_server_get_resolution_list(
       conf[j].height      = dm.dmPelsHeight;
       conf[j].bpp         = dm.dmBitsPerPel;
       conf[j].refreshrate = dm.dmDisplayFrequency;
+      /* It may be possible to get exact refresh rate via different API - for now, it is integer only */
+      conf[j].refreshrate_float = 0.0f;
       conf[j].idx         = j;
       conf[j].current     = false;
+#if _WIN32_WINNT >= 0x0500
+      conf[j].interlaced  = (dm.dmDisplayFlags & DM_INTERLACED) ? true : false;
+#else
+      conf[j].interlaced  = false;
+#endif
+      conf[j].dblscan     = false; /* no flag for doublescan on this platform */
 
       if (     (conf[j].width       == curr_width)
             && (conf[j].height      == curr_height)
             && (conf[j].bpp         == curr_bpp)
             && (conf[j].refreshrate == curr_refreshrate)
+            && (conf[j].interlaced  == curr_interlaced)
          )
          conf[j].current  = true;
 

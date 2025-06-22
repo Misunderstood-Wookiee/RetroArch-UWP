@@ -454,7 +454,7 @@ extern const hci_cmd_t rfcomm_register_service;
 extern const hci_cmd_t rfcomm_register_service_with_initial_credits;
 /* unregister rfcomm service, @param service_channel(16) */
 extern const hci_cmd_t rfcomm_unregister_service;
-/* request persisten rfcomm channel for service name: serive name (char*)  */
+/* request persistent rfcomm channel for service name: serive name (char*)  */
 extern const hci_cmd_t rfcomm_persistent_channel_for_service;
 
 /* linked_list.h */
@@ -766,12 +766,11 @@ static void btpad_increment_position(uint32_t *ptr)
 }
 
 static void btpad_connection_send_control(void *data,
-      uint8_t* data_buf, size_t size)
+      uint8_t *s, size_t len)
 {
    struct btstack_hid_adapter *connection = (struct btstack_hid_adapter*)data;
-
    if (connection)
-      bt_send_l2cap_ptr(connection->channels[0], data_buf, size);
+      bt_send_l2cap_ptr(connection->channels[0], s, len);
 }
 
 static void btpad_queue_process_cmd(struct btpad_queue_command *cmd)
@@ -1425,11 +1424,11 @@ static int16_t btstack_hid_joypad_state(
       const uint32_t joyaxis = (binds[i].joyaxis != AXIS_NONE)
          ? binds[i].joyaxis : joypad_info->auto_binds[i].joyaxis;
       if (
-               (uint16_t)joykey != NO_BTN 
+               (uint16_t)joykey != NO_BTN
             && btstack_hid_joypad_button(data, port_idx, (uint16_t)joykey))
          ret |= ( 1 << i);
       else if (joyaxis != AXIS_NONE &&
-            ((float)abs(btstack_hid_joypad_axis(data, port_idx, joyaxis)) 
+            ((float)abs(btstack_hid_joypad_axis(data, port_idx, joyaxis))
              / 0x8000) > joypad_info->axis_threshold)
          ret |= (1 << i);
    }

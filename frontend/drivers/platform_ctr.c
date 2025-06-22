@@ -61,6 +61,9 @@
 #endif
 #endif
 
+#include "../../audio/audio_driver.h"
+#include "../../menu/menu_entries.h"
+
 static enum frontend_fork ctr_fork_mode = FRONTEND_FORK_NONE;
 static const char* elf_path_cst         = "sdmc:/retroarch/retroarch.3dsx";
 
@@ -79,7 +82,7 @@ static void get_first_valid_core(char* path_return, size_t len)
       {
          if (!ent)
             break;
-         if (strlen(ent->d_name) > strlen(extension) 
+         if (strlen(ent->d_name) > strlen(extension)
                && !strcmp(ent->d_name + strlen(ent->d_name) - strlen(extension), extension))
          {
             size_t _len = strlcpy(path_return, "sdmc:/retroarch/cores/", len);
@@ -138,6 +141,12 @@ static void frontend_ctr_get_env(int* argc, char* argv[],
    dir_check_defaults("custom.ini");
 #endif
 }
+
+#ifdef USE_CTRULIB_2
+u8* gfxTopLeftFramebuffers[2];
+u8* gfxTopRightFramebuffers[2];
+u8* gfxBottomFramebuffers[2];
+#endif
 
 static void frontend_ctr_deinit(void* data)
 {
@@ -244,8 +253,8 @@ static void frontend_ctr_exec(const char *path, bool should_load_game)
          is corrupt so we have to quit */
       {
          char error[PATH_MAX + 32];
-
-         snprintf(error, sizeof(error), "Can't launch core: %s", path);
+         size_t _len = strlcpy(error, "Can't launch core: ", sizeof(error));
+         strlcpy(error + _len, path, sizeof(error) - _len);
          error_and_quit(error);
       }
    }
@@ -335,7 +344,7 @@ static void ctr_check_dspfirm(void)
                {
                   size_t dspfirm_size = ptr[1];
                   ptr -= 0x40;
-                  if ((ptr + (dspfirm_size >> 2)) > 
+                  if ((ptr + (dspfirm_size >> 2)) >
                         (code_buffer + (code_size >> 2)))
                      break;
 
@@ -371,10 +380,6 @@ __attribute__((weak)) u32 __ctr_patch_services;
 void gfxSetFramebufferInfo(gfxScreen_t screen, u8 id);
 
 #ifdef USE_CTRULIB_2
-u8* gfxTopLeftFramebuffers[2];
-u8* gfxTopRightFramebuffers[2];
-u8* gfxBottomFramebuffers[2];
-
 void gfxSetFramebufferInfo(gfxScreen_t screen, u8 id)
 {
    if (screen==GFX_TOP)
@@ -408,8 +413,6 @@ static void frontend_ctr_init(void* data)
 {
 #ifndef IS_SALAMANDER
    extern audio_driver_t audio_null;
-
-   (void)data;
 
    verbosity_enable();
 
@@ -465,7 +468,8 @@ static void frontend_ctr_init(void* data)
    if (csndInit() != 0)
       audio_ctr_csnd = audio_null;
    ctr_check_dspfirm();
-   if (ndspInit() != 0) {
+   if (ndspInit() != 0)
+   {
       audio_ctr_dsp = audio_null;
 #ifdef HAVE_THREADS
       audio_ctr_dsp_thread = audio_null;
@@ -480,7 +484,7 @@ static void frontend_ctr_init(void* data)
 static int frontend_ctr_get_rating(void)
 {
    u8 device_model = 0xFF;
-   
+
    /*(0 = O3DS, 1 = O3DSXL, 2 = N3DS, 3 = 2DS, 4 = N3DSXL, 5 = N2DSXL)*/
    CFGU_GetSystemModel(&device_model);
 
@@ -569,12 +573,11 @@ static enum frontend_powerstate frontend_ctr_get_powerstate(
    return FRONTEND_POWERSTATE_ON_POWER_SOURCE;
 }
 
-static void frontend_ctr_get_os(char* s, size_t len, int* major, int* minor)
+static size_t frontend_ctr_get_os(char* s, size_t len, int* major, int* minor)
 {
    OS_VersionBin cver;
    OS_VersionBin nver;
-
-   strlcpy(s, "3DS OS", len);
+   size_t _len = strlcpy(s, "3DS OS", len);
    Result data_invalid = osGetSystemVersionData(&nver, &cver);
    if (data_invalid == 0)
    {
@@ -586,13 +589,13 @@ static void frontend_ctr_get_os(char* s, size_t len, int* major, int* minor)
       *major = 0;
       *minor = 0;
    }
-
+   return _len;
 }
 
 static void frontend_ctr_get_name(char* s, size_t len)
 {
    u8 device_model = 0xFF;
-   
+
    /*(0 = O3DS, 1 = O3DSXL, 2 = N3DS, 3 = 2DS, 4 = N3DSXL, 5 = N2DSXL)*/
    CFGU_GetSystemModel(&device_model);
 
