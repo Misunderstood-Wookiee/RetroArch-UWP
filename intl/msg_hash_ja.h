@@ -2260,14 +2260,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "フルスクリーンモードで開始"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "フルスクリーンで開始します。実行中に変更できます。コマンドラインスイッチで上書きできます。"
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "ウィンドウフルスクリーンモード"
    )
@@ -3333,14 +3325,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ANDROID_INPUT_DISCONNECT_WORKAROUND,
    "コントローラーの切断と再接続を回避するための回避策です。同じ型番のコントローラーを使用する 2 人のプレイヤーに影響を与えます。"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "終了時に確認"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "終了ホットキーで RetroArch を終了するとき、2 度押しを要求します。"
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -12918,14 +12902,6 @@ MSG_HASH(
    "対応しているすべてのコアが Play ストアバージョンに切り替わりました"
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "更新したコア: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "スキップしたコア: "
-   )
-MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
    "コアの更新は無効です - コアがロックされています: "
    )
@@ -13276,18 +13252,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_GET_NICKNAME_FROM_CLIENT,
    "クライアントのニックネームの取得に失敗しました。"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "ロードに失敗しました"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "コンテンツのロードに失敗しました"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "動画ファイルのロードに失敗しました"
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,

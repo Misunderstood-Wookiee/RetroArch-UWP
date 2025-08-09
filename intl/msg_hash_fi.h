@@ -859,6 +859,10 @@ MSG_HASH(
    "7zip-tuki"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Zstandard-tuki"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Dynaaminen kirjastotuki"
    )
@@ -2152,14 +2156,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Käynnistä koko näytön tilassa"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Käynnistä koko näytön tilassa. Voidaan muuttaa suorituksen aikana. Komentoriviargumentti voi ohittaa tämän."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "Ikkunoitu koko näytön tila"
    )
@@ -3081,14 +3077,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,
    "Android-yhteyden katkaisun kiertotapa"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Vahvista lopetus"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "Vaadi Lopeta-pikanäppäintä painettavan kahdesti lopettaaksesi RetroArchin."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -12086,14 +12074,6 @@ MSG_HASH(
    "Kaikki tuetut ytimet vaihdettu play kaupan versioihin"
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "ytimet päivitetty: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "ytimet ohitettu: "
-   )
-MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
    "Ydinpäivitys poistettu käytöstä - ydin on lukittu: "
    )
@@ -12436,18 +12416,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_GET_NICKNAME_FROM_CLIENT,
    "Nimimerkin saaminen asiakkaalta epäonnistui."
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Lataaminen epäonnistui"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Sisällön lataaminen epäonnistui"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Elokuvatiedoston lataaminen epäonnistui"
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,

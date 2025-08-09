@@ -867,6 +867,10 @@ MSG_HASH(
    "Prise en charge de 7zip "
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Prise en charge de Zstandard"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Prise en charge des bibliothèques dynamiques "
    )
@@ -2102,6 +2106,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_NOTCH_WRITE_OVER,
    "Activer le dépassement de l'encoche (notch) en plein écran sur les appareils Android et iOS"
 )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Utiliser les mémoires tampon d'arguments de Metal (Redémarrage requis)"
+)
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Essaye d'améliorer les performances en utilisant les mémoires tampon pour les arguments de Metal. Certains cœurs peuvent nécessiter cette option. Cela peut empêcher certains shaders de fonctionner, en particulier sur du matériel ancien ou d'anciennes versions du système d'exploitation."
+)
 
 /* Settings > Video > CRT SwitchRes */
 
@@ -2301,11 +2313,11 @@ MSG_HASH(
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Démarrer en mode plein écran"
+   "Affichage plein écran"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Démarrer en mode plein écran. Peut être changé lors de l'exécution, et peut être remplacé par une option en ligne de commande."
+   "Affichage en plein écran. Peut être changé lors de l'exécution, et peut être remplacé par une option en ligne de commande."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
@@ -3520,11 +3532,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Confirmer avant de quitter"
+   "Confirmer Quitter/Fermer/Réinitialiser"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "Nécessite que la touche de raccourci Quitter soit pressée deux fois pour quitter RetroArch."
+   "Requiert le double appui de la touche de raccourci Quitter/Fermer/Réinitialiser."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -7764,6 +7776,10 @@ MSG_HASH(
    "Joué pour la dernière fois :"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_PLAY_COUNT,
+   "Nombre de fois joué :"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_TIME_UNIT_SECONDS_SINGLE,
    "seconde"
    )
@@ -10049,6 +10065,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_CANCEL,
    "Laisser le mode Hardcore des succès désactivé pour la session en cours"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Reprise du mode Hardcore des succès désactivée"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Vous devez recharger le cœur pour reprendre le mode Hardcore des succès"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_PAUSE,
@@ -13095,6 +13119,14 @@ MSG_HASH(
    "Base de données - Filtre : Note du magazine Edge"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_GENRE,
+   "Base de données - Filtre : Genre"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_REGION,
+   "Base de données - Filtre : Région"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_DATABASE_INFO,
    "Informations de la base de données"
    )
@@ -13487,11 +13519,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NUM_CORES_UPDATED,
-   "cœurs mis à jour : "
+   "Cœurs mis à jour : "
    )
 MSG_HASH(
    MSG_NUM_CORES_LOCKED,
-   "cœurs ignorés : "
+   "Cœurs ignorés : "
    )
 MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
@@ -13660,6 +13692,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_CORE_DOES_NOT_SUPPORT_SAVESTATES,
    "Le cœur ne prend pas en charge les sauvegardes instantanées."
+   )
+MSG_HASH(
+   MSG_CORE_DOES_NOT_SUPPORT_DISK_OPTIONS,
+   "Le cœur ne prend pas en charge le contrôle du disque."
    )
 MSG_HASH(
    MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY,
@@ -14000,6 +14036,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT,
    "Incompatible avec le replay"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE,
+   "Impossible de charger un état futur pendant la lecture"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE,
+   "Erreur de timeline erronée lors de la lecture"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY,
+   "Mauvaise timeline ; écrasement de l'enregistrement"
    )
 MSG_HASH(
    MSG_FOUND_SHADER,
@@ -14444,6 +14492,14 @@ MSG_HASH(
 MSG_HASH(
    MSG_PRESS_AGAIN_TO_QUIT,
    "Appuyez à nouveau pour quitter..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_CLOSE_CONTENT,
+   "Appuyer à nouveau pour fermer le contenu..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_RESET,
+   "Appuyer à nouveau pour réinitialiser..."
    )
 MSG_HASH(
    MSG_TO,

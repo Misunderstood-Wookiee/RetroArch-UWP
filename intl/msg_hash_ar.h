@@ -2032,14 +2032,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "البدء في وضع ملء الشاشة"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "ابدأ في ملء الشاشة. يمكن تغييرها في وقت التشغيل. يمكن تجاوزها بواسطة مفتاح سطر الأوامر."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "وضع ملء الشاشة النافذة"
    )
@@ -2617,10 +2609,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_USER_BINDS,
    "منفذ %u ربط"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "اضغط على الخروج مرتين"
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -8262,14 +8250,6 @@ MSG_HASH(
    "جميع النواة المثبتة في الإصدار الأحدث"
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "تم تحديث النواة: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "تم تخطي النواة "
-   )
-MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
    "تم تعطيل تحديث النواة - النواة الأساسية مقفلة: "
    )
@@ -8532,18 +8512,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_GET_NICKNAME_FROM_CLIENT,
    "فشل في الحصول على الاسم المستعار من العميل."
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "فشل التحميل"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "فشل تحميل المحتوى"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "فشل تحميل ملف الفيلم"
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,

@@ -851,6 +851,10 @@ MSG_HASH(
    "7zip-Unterstützung"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Zstandard-Unterstützung"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Unterstützung für dynamische Bibliotheken"
    )
@@ -2054,6 +2058,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_NOTCH_WRITE_OVER,
    "Vollbild über Notch auf Android und iOS-Geräten aktivieren"
 )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Metallargumentpuffer verwenden (Neustart erforderlich)"
+)
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Versuchen, die Leistung durch Verwendung von Metallargumentpuffer zu verbessern. Einige Cores können dies erfordern. Dies kann einige Shader stören, insbesondere bei alten Hardware- oder Betriebssystemversionen."
+)
 
 /* Settings > Video > CRT SwitchRes */
 
@@ -2249,11 +2261,11 @@ MSG_HASH(
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Im Vollbild starten"
+   "Vollbildanzeige"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Im Vollbildmodus starten. Kann zur Laufzeit geändert werden. Kann durch einen Befehlszeilenschalter überschrieben werden."
+   "Anzeige im Vollbild.Lässt sich während der Laufzeit ändern. Kann über einen Kommandozeilenschalter übersteuert werden."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
@@ -3464,11 +3476,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Beenden bestätigen"
+   "Beenden/Schließen/Zurücksetzen bestätigen"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "Zum Beenden von RetroArch muss der Beenden-Hotkey zweimal gedrückt werden."
+   "Verlangt, dass der Hotkey Beenden/Schließen/Zurücksetzen zweimal gedrückt wird."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -7680,6 +7692,10 @@ MSG_HASH(
    "Zuletzt gespielt:"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_PLAY_COUNT,
+   "Gespielt:"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_TIME_UNIT_SECONDS_SINGLE,
    "Sekunde"
    )
@@ -9917,6 +9933,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_CANCEL,
    "Den Errungenschaften-Hardcore-Modus für die aktuelle Sitzung deaktiviert lassen"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Errungenschaften-Hardcore-Modus-deaktiviert fortsetzen"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Der Kern muss neu geladen werden, um den Errungenschaften-Hardcore-Modus fortzusetzen"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_PAUSE,
@@ -12791,6 +12815,14 @@ MSG_HASH(
    "Datenbank - Filter: Edge-Bewertung"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_GENRE,
+   "Datenbank - Filter: Genre"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_REGION,
+   "Datenbank - Filter: Region"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_DATABASE_INFO,
    "Datenbank-Informationen"
    )
@@ -13354,6 +13386,10 @@ MSG_HASH(
    "Core unterstützt keine Speicherabbilder."
    )
 MSG_HASH(
+   MSG_CORE_DOES_NOT_SUPPORT_DISK_OPTIONS,
+   "Core unterstützt kein Disc Control."
+   )
+MSG_HASH(
    MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY,
    "Core-Einstellungsdatei wurde erfolgreich erstellt."
    )
@@ -13539,15 +13575,15 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD,
-   "Laden fehlgeschlagen"
+   "Laden fehlgeschlagen."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_CONTENT,
-   "Laden des Inhalts fehlgeschlagen"
+   "Laden des Inhalts fehlgeschlagen."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Laden der Filmdatei fehlgeschlagen"
+   "Laden der Filmdatei fehlgeschlagen."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,
@@ -13692,6 +13728,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT,
    "Nicht kompatibel mit Replay"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE,
+   "Zukünftiger Status kann während der Wiedergabe nicht geladen werden"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE,
+   "Fehler in der Zeitschiene während der Wiedergabe"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY,
+   "Falsche Zeitschiene; Aufnahme wird überschrieben"
    )
 MSG_HASH(
    MSG_FOUND_SHADER,
@@ -14140,6 +14188,14 @@ MSG_HASH(
 MSG_HASH(
    MSG_PRESS_AGAIN_TO_QUIT,
    "Zum Beenden erneut drücken..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_CLOSE_CONTENT,
+   "Erneut drücken, um Inhalt zu schließen ..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_RESET,
+   "Zum Zurücksetzen erneut drücken ..."
    )
 MSG_HASH(
    MSG_TO,

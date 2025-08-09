@@ -1406,10 +1406,6 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_USER_BINDS,
    "Controles del puertu %u"
    )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Confirmación de la salida"
-   )
 
 /* Settings > Input > Haptic Feedback/Vibration */
 
@@ -4012,10 +4008,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_EXTRACT_CONTENT_FROM_COMPRESSED_FILE,
    "Hebo un error al estrayer el conteníu del ficheru comprimíu"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Hebo un error al cargar"
    )
 MSG_HASH(
    MSG_FAILED_TO_UNMUTE_AUDIO,

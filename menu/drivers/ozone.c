@@ -47,6 +47,7 @@
 #include "../../configuration.h"
 #include "../../content.h"
 #include "../../core_info.h"
+#include "../../defaults.h"
 #include "../../file_path_special.h"
 #include "../../runtime_file.h"
 #include "../../input/input_osk.h"
@@ -109,7 +110,7 @@
 
 #if defined(__APPLE__)
 /* UTF-8 support is currently broken on Apple devices... */
-#define OZONE_TICKER_SPACER           "   |   "
+#define OZONE_TICKER_SPACER           TICKER_SPACER_DEFAULT
 #else
 /* <EM SPACE><BULLET><EM SPACE>
  * UCN equivalent: "\u2003\u2022\u2003" */
@@ -650,6 +651,7 @@ struct ozone_handle
    bool show_thumbnail_bar;
    bool show_playlist_tabs;
    bool sidebar_collapsed;
+   bool font_unicode;
 
    struct
    {
@@ -1986,10 +1988,6 @@ static uintptr_t ozone_entries_icon_get_texture(
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_MAIN_MENU];
       case MENU_ENUM_LABEL_UPDATE_CHEATS:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_CHEAT_OPTIONS];
-#if 0
-/* Thumbnailpack removal */
-      case MENU_ENUM_LABEL_THUMBNAILS_UPDATER_LIST:
-#endif
       case MENU_ENUM_LABEL_PL_THUMBNAILS_UPDATER_LIST:
       case MENU_ENUM_LABEL_DOWNLOAD_PL_ENTRY_THUMBNAILS:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_DOWNLOAD_THUMBNAILS:
@@ -3001,7 +2999,10 @@ static void ozone_draw_icon(
    draw.pipeline_id     = 0;
 
    if (draw.height > 0 && draw.width > 0)
-      dispctx->draw(&draw, userdata, video_width, video_height);
+   {
+      if (dispctx && dispctx->draw)
+         dispctx->draw(&draw, userdata, video_width, video_height);
+   }
 }
 
 static int ozone_wiggle(ozone_handle_t* ozone, float t)
@@ -3362,8 +3363,6 @@ static void ozone_draw_sidebar(
    unsigned i, sidebar_height;
    gfx_animation_ctx_ticker_t ticker;
    gfx_animation_ctx_ticker_smooth_t ticker_smooth;
-   static const char* const
-         ticker_spacer               = OZONE_TICKER_SPACER;
    unsigned ticker_x_offset          = 0;
    uint32_t text_alpha               = ozone->animations.sidebar_text_alpha * 255.0f;
    float scale_factor                = ozone->last_scale_factor;
@@ -3379,7 +3378,7 @@ static void ozone_draw_sidebar(
       ticker_smooth.font          = ozone->fonts.sidebar.font;
       ticker_smooth.font_scale    = 1.0f;
       ticker_smooth.type_enum     = menu_ticker_type;
-      ticker_smooth.spacer        = ticker_spacer;
+      ticker_smooth.spacer        = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
       ticker_smooth.x_offset      = &ticker_x_offset;
       ticker_smooth.dst_str_width = NULL;
    }
@@ -3387,7 +3386,7 @@ static void ozone_draw_sidebar(
    {
       ticker.idx                  = p_anim->ticker_idx;
       ticker.type_enum            = menu_ticker_type;
-      ticker.spacer               = ticker_spacer;
+      ticker.spacer               = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
    }
 
    horizontal_list_size           = (ozone->show_playlist_tabs)
@@ -3556,18 +3555,51 @@ static void ozone_draw_sidebar(
       {
          enum msg_hash_enums value_idx  = ozone_system_tabs_value[ozone->tabs[i]];
          const char *title              = msg_hash_to_str(value_idx);
-         uint32_t text_color            = selected
+         uint32_t text_color            = 0;
+         if (ozone->theme)
+            text_color                  = selected
                ? COLOR_TEXT_ALPHA(ozone->theme->text_selected_rgba, text_alpha)
                : COLOR_TEXT_ALPHA(ozone->theme->text_sidebar_rgba, text_alpha);
+
+         if (use_smooth_ticker)
+         {
+            ticker_smooth.selected    = selected;
+            /* TODO/FIXME - undefined behavior reported by ASAN -
+             *-12.549 is outside the range of representable values
+             of type 'unsigned int'
+             * */
+            ticker_smooth.field_width = (entry_width
+                  - ozone->dimensions.sidebar_entry_icon_size
+                  - 40 * scale_factor);
+            ticker_smooth.src_str     = title;
+            ticker_smooth.dst_str     = console_title;
+            ticker_smooth.dst_str_len = sizeof(console_title);
+
+            gfx_animation_ticker_smooth(&ticker_smooth);
+         }
+         else
+         {
+            ticker.len      = (entry_width
+                  - ozone->dimensions.sidebar_entry_icon_size
+                  - 40 * scale_factor)
+                  / ozone->fonts.sidebar.glyph_width;
+            ticker.s        = console_title;
+            ticker.selected = selected;
+            ticker.str      = title;
+
+            gfx_animation_ticker(&ticker);
+         }
+
          gfx_display_draw_text(
                ozone->fonts.sidebar.font,
-               title,
-               ozone->sidebar_offset
+               console_title,
+               ticker_x_offset
+                     + ozone->sidebar_offset
                      + ozone->dimensions.sidebar_padding_horizontal
                      + ozone->dimensions.sidebar_entry_icon_padding * 2
                      + ozone->dimensions.sidebar_entry_icon_size,
                y
-                     + ozone->dimensions.sidebar_entry_height / 2.0f
+                     + ozone->dimensions.sidebar_entry_height / 2
                      + ozone->fonts.sidebar.line_centre_offset
                      + ozone->animations.scroll_y_sidebar,
                video_width,
@@ -3613,7 +3645,9 @@ static void ozone_draw_sidebar(
          ozone_node_t *node   = (ozone_node_t*)ozone->horizontal_list.list[i].userdata;
          float *col           = NULL;
          bool selected        = (ozone->categories_selection_ptr == ozone->system_tab_end + 1 + i);
-         uint32_t text_color  = COLOR_TEXT_ALPHA((selected
+         uint32_t text_color  = 0;
+         if (ozone->theme)
+            text_color        = COLOR_TEXT_ALPHA((selected
                ? ozone->theme->text_selected_rgba
                : ozone->theme->text_sidebar_rgba), text_alpha);
 
@@ -5033,11 +5067,11 @@ static void ozone_context_reset_horizontal_list(ozone_handle_t *ozone)
          __len    = fill_pathname_join_special(texturepath,
                ozone->icons_path, sysname,
                sizeof(texturepath));
-         __len   += strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
+         strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
 
          /* If the playlist icon doesn't exist, return default */
          if (!path_is_valid(texturepath))
-            __len = fill_pathname_join_special(
+            fill_pathname_join_special(
                   texturepath, ozone->icons_path, "default.png",
                   sizeof(texturepath));
 
@@ -5088,6 +5122,7 @@ static void ozone_context_reset_horizontal_list(ozone_handle_t *ozone)
 
          if (node->console_name)
             free(node->console_name);
+         node->console_name = NULL;
 
          /* Note: console_name will *always* be valid here,
           * but provide a fallback to prevent NULL pointer
@@ -5164,13 +5199,6 @@ static void ozone_refresh_system_tabs_list(ozone_handle_t * ozone)
    if (settings->bools.menu_content_show_video)
       ozone->tabs[++ozone->system_tab_end] = OZONE_SYSTEM_TAB_VIDEO;
 #endif
-
-#if 0 /* Move Netplay to Main Menu */
-#ifdef HAVE_NETWORKING
-   if (settings->bools.menu_content_show_netplay)
-      ozone->tabs[++ozone->system_tab_end] = OZONE_SYSTEM_TAB_NETPLAY;
-#endif
-#endif /* 0 */
 
    if (      settings->uints.menu_content_show_add_entry == MENU_ADD_CONTENT_ENTRY_DISPLAY_PLAYLISTS_TAB
          && !settings->bools.kiosk_mode_enable)
@@ -5826,8 +5854,6 @@ border_iterate:
       unsigned ticker_x_offset     = 0;
       unsigned ticker_str_width    = 0;
       int value_x_offset           = 0;
-      static const char* const
-            ticker_spacer          = OZONE_TICKER_SPACER;
       const char *sublabel_str     = NULL;
       ozone_node_t *node           = NULL;
       const char *entry_rich_label = NULL;
@@ -5843,7 +5869,7 @@ border_iterate:
          ticker_smooth.font          = ozone->fonts.entries_label.font;
          ticker_smooth.font_scale    = 1.0f;
          ticker_smooth.type_enum     = menu_ticker_type;
-         ticker_smooth.spacer        = ticker_spacer;
+         ticker_smooth.spacer        = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
          ticker_smooth.x_offset      = &ticker_x_offset;
          ticker_smooth.dst_str_width = &ticker_str_width;
       }
@@ -5851,7 +5877,7 @@ border_iterate:
       {
          ticker.idx                  = p_anim->ticker_idx;
          ticker.type_enum            = menu_ticker_type;
-         ticker.spacer               = ticker_spacer;
+         ticker.spacer               = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
       }
 
       node                           = (ozone_node_t*)selection_buf->list[i].userdata;
@@ -6013,7 +6039,8 @@ border_iterate:
             {
                ozone_node_t *sidebar_node = (ozone_node_t*)
                      (ozone->horizontal_list.size)
-                        ? file_list_get_userdata_at_offset(&ozone->horizontal_list, selection_buf->list[i].entry_idx)
+                        ? (ozone_node_t*)file_list_get_userdata_at_offset(
+                              &ozone->horizontal_list, selection_buf->list[i].entry_idx)
                         : NULL;
 
                if (sidebar_node && sidebar_node->icon)
@@ -6346,7 +6373,7 @@ static void ozone_draw_thumbnail_bar(
 
       right_thumbnail_alignment  = GFX_THUMBNAIL_ALIGN_CENTRE;
       show_left_thumbnail        = false;
-      
+
       if (thumbnail_height > thumbnail_width)
       {
          thumbnail_height /= 2;
@@ -6374,7 +6401,7 @@ static void ozone_draw_thumbnail_bar(
             0.05f, 0.05f, 0.05f, 1.0f,
             0.05f, 0.05f, 0.05f, 1.0f,
       };
-      
+
       /* Darken background */
       gfx_display_draw_quad(
             p_disp,
@@ -6586,7 +6613,6 @@ static void ozone_draw_thumbnail_bar(
       char ticker_buf[NAME_MAX_LENGTH];
       gfx_animation_ctx_ticker_t ticker;
       gfx_animation_ctx_ticker_smooth_t ticker_smooth;
-      static const char* const ticker_spacer = OZONE_TICKER_SPACER;
       unsigned ticker_x_offset               = 0;
       bool scroll_content_metadata           = settings->bools.ozone_scroll_content_metadata;
       bool use_smooth_ticker                 = settings->bools.menu_ticker_smooth;
@@ -6615,7 +6641,7 @@ static void ozone_draw_thumbnail_bar(
             ticker_smooth.idx                = p_anim->ticker_pixel_idx;
             ticker_smooth.font_scale         = 1.0f;
             ticker_smooth.type_enum          = menu_ticker_type;
-            ticker_smooth.spacer             = ticker_spacer;
+            ticker_smooth.spacer             = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
             ticker_smooth.x_offset           = &ticker_x_offset;
             ticker_smooth.dst_str_width      = NULL;
 
@@ -6629,7 +6655,7 @@ static void ozone_draw_thumbnail_bar(
          {
             ticker.idx                       = p_anim->ticker_idx;
             ticker.type_enum                 = menu_ticker_type;
-            ticker.spacer                    = ticker_spacer;
+            ticker.spacer                    = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
 
             ticker.selected                  = true;
             ticker.len                       = (sidebar_width - (separator_padding * 2)) / ozone->fonts.footer.glyph_width;
@@ -8221,6 +8247,8 @@ static enum menu_action ozone_parse_menu_entry_action(
                   ? ozone_get_onscreen_category_selection(ozone)
                   : ozone->categories_selection_ptr;
 
+            playlist_path[0] = '\0';
+
             if (!ozone_manage_available(ozone, ozone->selection))
                break;
 
@@ -8230,37 +8258,34 @@ static enum menu_action ozone_parse_menu_entry_action(
             if (list_selection < 0)
             {
                enum msg_hash_enums value_idx = ozone_system_tabs_label[ozone->tabs[tab_selection]];
-               const char *tab_title;
 
                switch (value_idx)
                {
                   case MENU_ENUM_LABEL_HISTORY_TAB:
-                     tab_title = FILE_PATH_CONTENT_HISTORY;
+                     strlcpy(playlist_path, playlist_get_conf_path(g_defaults.content_history), sizeof(playlist_path));
                      break;
                   case MENU_ENUM_LABEL_FAVORITES_TAB:
-                     tab_title = FILE_PATH_CONTENT_FAVORITES;
+                     strlcpy(playlist_path, playlist_get_conf_path(g_defaults.content_favorites), sizeof(playlist_path));
                      break;
                   case MENU_ENUM_LABEL_IMAGES_TAB:
-                     tab_title = FILE_PATH_CONTENT_IMAGE_HISTORY;
+#ifdef HAVE_IMAGEVIEWER
+                     strlcpy(playlist_path, playlist_get_conf_path(g_defaults.image_history), sizeof(playlist_path));
+#endif
                      break;
                   case MENU_ENUM_LABEL_MUSIC_TAB:
-                     tab_title = FILE_PATH_CONTENT_MUSIC_HISTORY;
+                     strlcpy(playlist_path, playlist_get_conf_path(g_defaults.music_history), sizeof(playlist_path));
                      break;
                   case MENU_ENUM_LABEL_VIDEO_TAB:
-                     tab_title = FILE_PATH_CONTENT_VIDEO_HISTORY;
+#if defined(HAVE_FFMPEG) || defined(HAVE_MPV)
+                     strlcpy(playlist_path, playlist_get_conf_path(g_defaults.video_history), sizeof(playlist_path));
+#endif
                      break;
                   default:
-                     tab_title = "";
                      break;
                }
 
-               if (string_is_empty(tab_title))
+               if (string_is_empty(playlist_path))
                   break;
-
-               fill_pathname_join(playlist_path,
-                     "",
-                     tab_title,
-                     sizeof(playlist_path));
             }
             else
                fill_pathname_join(playlist_path,
@@ -9526,6 +9551,8 @@ static void ozone_set_layout(
    if (!string_is_empty(path_menu_font))
       strlcpy(font_path, path_menu_font, sizeof(font_path));
 
+   ozone->font_unicode = !string_is_equal(path_menu_font, FILE_PATH_UNKNOWN) ? true : false;
+
    /* Sidebar */
    font_inited = ozone_init_font(&ozone->fonts.sidebar,
          is_threaded, font_path, FONT_SIZE_SIDEBAR * scale_factor * font_scale_factor_global * font_scale_factor_sidebar);
@@ -10689,7 +10716,6 @@ static void ozone_draw_header(
       math_matrix_4x4 *mymat)
 {
    char title[NAME_MAX_LENGTH];
-   static const char* const ticker_spacer   = OZONE_TICKER_SPACER;
    gfx_animation_ctx_ticker_t ticker;
    gfx_animation_ctx_ticker_smooth_t ticker_smooth;
    unsigned ticker_x_offset                 = 0;
@@ -10718,7 +10744,7 @@ static void ozone_draw_header(
       ticker_smooth.idx           = p_anim->ticker_pixel_idx;
       ticker_smooth.font_scale    = 1.0f;
       ticker_smooth.type_enum     = menu_ticker_type;
-      ticker_smooth.spacer        = ticker_spacer;
+      ticker_smooth.spacer        = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
       ticker_smooth.x_offset      = &ticker_x_offset;
       ticker_smooth.dst_str_width = NULL;
    }
@@ -10726,7 +10752,7 @@ static void ozone_draw_header(
    {
       ticker.idx                  = p_anim->ticker_idx;
       ticker.type_enum            = menu_ticker_type;
-      ticker.spacer               = ticker_spacer;
+      ticker.spacer               = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
    }
 
    /* Separator */
@@ -11609,7 +11635,6 @@ static void ozone_draw_footer(
       gfx_animation_ctx_ticker_smooth_t ticker_smooth;
       char core_title[NAME_MAX_LENGTH];
       char core_title_buf[NAME_MAX_LENGTH];
-      static const char* const ticker_spacer          = OZONE_TICKER_SPACER;
       int usable_width;
       unsigned ticker_x_offset                        = 0;
       bool use_smooth_ticker                          =
@@ -11640,7 +11665,7 @@ static void ozone_draw_footer(
             ticker_smooth.idx           = p_anim->ticker_pixel_idx;
             ticker_smooth.font_scale    = 1.0f;
             ticker_smooth.type_enum     = menu_ticker_type;
-            ticker_smooth.spacer        = ticker_spacer;
+            ticker_smooth.spacer        = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
             ticker_smooth.x_offset      = &ticker_x_offset;
             ticker_smooth.dst_str_width = NULL;
 
@@ -11657,7 +11682,7 @@ static void ozone_draw_footer(
          {
             ticker.idx                  = p_anim->ticker_idx;
             ticker.type_enum            = menu_ticker_type;
-            ticker.spacer               = ticker_spacer;
+            ticker.spacer               = (ozone->font_unicode) ? OZONE_TICKER_SPACER : NULL;
 
             ticker.s                    = core_title_buf;
             ticker.len                  = usable_width / ozone->fonts.footer.glyph_width;

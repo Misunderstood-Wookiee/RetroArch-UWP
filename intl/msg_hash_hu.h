@@ -639,6 +639,10 @@ MSG_HASH(
    "JIT elérhető"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BUNDLE_IDENTIFIER,
+   "Csomagazonosító"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_FRONTEND_IDENTIFIER,
    "Frontend azonosító"
    )
@@ -849,6 +853,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_7ZIP_SUPPORT,
    "7zip támogatás"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Zstandart támogatás"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
@@ -1106,6 +1114,22 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_SAVE_NEW_CONFIG,
    "A jelenlegi konfiguráció mentése külön fájlba."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SAVE_AS_CONFIG,
+   "Beállítások mentése mint"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_AS_CONFIG,
+   "Aktuális beállítások mentése mint egyéni konfigurációs fájl"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SAVE_MAIN_CONFIG,
+   "Fő konfiguráció mentése"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_MAIN_CONFIG,
+   "Aktuális konfiguráció mentése mint fő konfiguráció."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RESET_TO_DEFAULT_CONFIG,
@@ -2090,6 +2114,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_NOTCH_WRITE_OVER,
    "A teljes képernyő kiterjesztése a bevágásra Android és iOS eszközökön"
 )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Metal argumens pufferek használata (újraindítás szükséges)"
+)
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_USE_METAL_ARG_BUFFERS,
+   "A teljesítmény javulhat a Metal argumentum pufferek használatával. Néhány magnak szüksége lehet erre, de hibát okozhat egyes shadereknél, különösen régi hardver vagy OS verzió esetén."
+)
 
 /* Settings > Video > CRT SwitchRes */
 
@@ -2289,11 +2321,11 @@ MSG_HASH(
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Indítás teljes képernyős módban"
+   "Teljes képernyős megjelenítés"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Indítás teljes képernyőn. Futás közben módosítható. Parancssori kapcsolóval felülírható."
+   "Megjelenítés teljes képernyőn. Futás közben módosítható, parancssori kapcsolóval felülírható."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
@@ -2654,6 +2686,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ADAPTIVE_VSYNC,
    "Adaptív VSync"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_ADAPTIVE_VSYNC,
+   "A VSync aktív, amíg a teljesítmény a megcélzott képfrissítés alá nem esik. Minimalizálhatja a döcögősséget amikor a teljesítmény nem éri el a valós időt, és energiát takaríthat meg. Nem kompatibilis "
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FRAME_DELAY,
@@ -3528,11 +3564,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Kilépés megerősítése"
+   "Kilépés/bezárás/újraindítás megerősítése"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "A Kilépés gyorsgombot kétszer kell megnyomni a Retroarch-ból kilépéshez."
+   "A Kilépés/Bezárás/Újraindítás gyorsgombok két lenyomást igényelnek."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -10083,6 +10119,14 @@ MSG_HASH(
    "Kikapcsolva hagyja a trófeák Hardcore módját a mostani játékmenetre"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "A Hardcore trófea mód visszaállításának letiltása"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "A Hardcore trófea mód újraaktiválásához újra kell tölteni a magot"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_PAUSE,
    "A trófeák Hardcore módjának szüneteltetése"
    )
@@ -11431,6 +11475,74 @@ MSG_HASH(
    "Betűméret"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE,
+   "A menü betűtípus mérete változtatható legyen-e, és ha igen, egyben vagy a menü részei szerint egyesével."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_GLOBAL,
+   "Globális"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_SEPARATE,
+   "Külön értékek"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_GLOBAL,
+   "Betűméret szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_GLOBAL,
+   "A betűkészlet méretének változtatása az egész menüre vonatkozóan."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_TITLE,
+   "Címsor betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_TITLE,
+   "A menü fejlécében található címsor betűméretének szorzója."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_SIDEBAR,
+   "Bal oldalsáv betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_SIDEBAR,
+   "A bal oldalsáv betűméretének szorzója."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_LABEL,
+   "Címkék betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_LABEL,
+   "A menüelemek és játéklista bejegyzések címkéinek betűmérete. A súgódobozokban megjelenő szöveg méretét is befolyásolja."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_SUBLABEL,
+   "Alcímkék betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_SUBLABEL,
+   "A menüelemek és játéklista bejegyzések alcímkéinek betűmérete."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_TIME,
+   "Dátum-idő betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_TIME,
+   "A menü jobb felső sarkában található dátum-idő kijelzés betűmérete."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_FONT_SCALE_FACTOR_FOOTER,
+   "Lábléc betűméretének szorzója"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_FONT_SCALE_FACTOR_FOOTER,
+   "A menü láblécében található szöveg betűméretének szorzója. A jobb oldali bélyegkép sáv betűméretére is hatással van."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_OZONE_COLLAPSE_SIDEBAR,
    "Oldalsáv összecsukása"
    )
@@ -11477,6 +11589,22 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_OZONE_THUMBNAIL_SCALE_FACTOR,
    "A bélyegkép oszlop méretezése."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_PADDING_FACTOR,
+   "Kitöltési szorzó"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_PADDING_FACTOR,
+   "A vízszintes helykitöltés szorzója."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_HEADER_SEPARATOR,
+   "Fejlécelválasztó"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_OZONE_HEADER_SEPARATOR,
+   "A fejléc és lábléc elválasztójának szélessége."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_OZONE_HEADER_SEPARATOR_NONE,
@@ -13167,11 +13295,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NUM_CORES_UPDATED,
-   "magok frissítve: "
+   "Magok frissítve: "
    )
 MSG_HASH(
    MSG_NUM_CORES_LOCKED,
-   "magok kihagyva: "
+   "Magok kihagyva: "
    )
 MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
@@ -13340,6 +13468,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_CORE_DOES_NOT_SUPPORT_SAVESTATES,
    "A mag nem támogatja a játékállás elmentését."
+   )
+MSG_HASH(
+   MSG_CORE_DOES_NOT_SUPPORT_DISK_OPTIONS,
+   "A mag nem támogatja a lemezváltást."
    )
 MSG_HASH(
    MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY,
@@ -13526,18 +13658,6 @@ MSG_HASH(
    "Becenév fogadása a klienstől sikertelen."
    )
 MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Nem sikerült betölteni"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Nem sikerült betölteni a tartalmat"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Nem sikerült betölteni a bemenet-újrajátszás fájlt"
-   )
-MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,
    "Képernyőrátét betöltése sikertelen."
    )
@@ -13680,6 +13800,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT,
    "Nem kompatibilis az újrajátszással"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE,
+   "Visszajátszás közben nem tölthető be jövőbeli állapot"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE,
+   "Rossz idővonal hiba visszajátszás közben"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY,
+   "Rossz idővonal, a felvétel felülíródik"
    )
 MSG_HASH(
    MSG_FOUND_SHADER,
@@ -13978,6 +14110,10 @@ MSG_HASH(
    "Visszatekerési puffer vége."
    )
 MSG_HASH(
+   MSG_SAVED_NEW_CONFIG_TO,
+   "Konfiiguráció mentve ide"
+   )
+MSG_HASH(
    MSG_SAVED_STATE_TO_SLOT,
    "Játékállás elmentve a #%d. rekeszbe."
    )
@@ -14120,6 +14256,14 @@ MSG_HASH(
 MSG_HASH(
    MSG_PRESS_AGAIN_TO_QUIT,
    "Nyomja meg ismét a kilépéshez..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_CLOSE_CONTENT,
+   "Nyomja meg ismét a tartalom bezárásához..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_RESET,
+   "Nyomja meg ismét az újraindításhoz..."
    )
 MSG_HASH(
    MSG_TO,

@@ -1736,14 +1736,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Spustiť v režime celej obrazovky"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Spustiť v režime na celú obrazovku. Môže byť zmenené počas behu. Môže byť prepísané prepínačom príkazového riadku."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "Maximalizované okno"
    )
@@ -2421,10 +2413,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_HOTKEY_BINDS,
    "Klávesové skratky"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Potvrdiť ukončenie"
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -6358,14 +6346,6 @@ MSG_HASH(
    "Kontrola jadra: "
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "aktualizované jadrá: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "preskočené jadrá: "
-   )
-MSG_HASH(
    MSG_AUDIO_MUTED,
    "Zvuk stlmený."
    )
@@ -6396,14 +6376,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_EXTRACTING,
    "Extrahujem"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Načítanie zlyhalo"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Obsah sa nepodarilo načítať"
    )
 MSG_HASH(
    MSG_FILE_NOT_FOUND,

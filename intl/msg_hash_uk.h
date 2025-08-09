@@ -875,6 +875,10 @@ MSG_HASH(
    "Підтримка 7zip"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Підтримка Zstandard"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Підтримка динамічних бібліотек"
    )
@@ -2134,6 +2138,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_NOTCH_WRITE_OVER,
    "Увімкнення повноекранного режиму поверх вирізу на пристроях Android та iOS"
 )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Використовувати буфери аргументів Metal (потрібен перезапуск)"
+)
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Спроба покращити продуктивність за допомогою буферів аргументів Metal. Для деяких ядер це може бути необхідно. Може викликати збої в роботі шейдерів, особливо на застарілому обладнанні чи старих версіях ОС."
+)
 
 /* Settings > Video > CRT SwitchRes */
 
@@ -2341,11 +2353,11 @@ MSG_HASH(
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Запуск у повноекранному режимі"
+   "Повноекранний дисплей"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Запускати в повноекранному режимі. Можна змінити під час запуску. Можна перевизначити ключем у командному рядку."
+   "Відображення на повноекранному режимі. Може бути змінене під час роботи. Може бути змінене за допомогою перемикача командного рядка."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
@@ -3572,11 +3584,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Підтвердити вихід"
+   "Підтвердити Вихід/Закрити/Скинути"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "Для виходу з RetroArch потрібно двічі натиснути комбінацію клавіш."
+   "Вимагати подвійного натискання гарячої клавіші для Вихід/Закрити/Скинути."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -10079,6 +10091,14 @@ MSG_HASH(
    "Вийти з режиму хардкорних досягнень вимкнуто для поточної сесії"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Досягнення у резюме: режим хардкору вимкнено"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Ви повинні перезавантажити ядро, щоб відновити досягнення в режимі \"Хардкор\""
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_PAUSE,
    "Призупинити Режим Хардкору Досягнень"
    )
@@ -13219,6 +13239,14 @@ MSG_HASH(
    "База даних - Фільтр: рейтинг Magazine Edge"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_GENRE,
+   "База даних - Фільтр: Жанр"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_REGION,
+   "База даних - Фільтр: Регіон"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_DATABASE_INFO,
    "Інформація про базу даних"
    )
@@ -13615,11 +13643,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NUM_CORES_UPDATED,
-   "оновлено ядер: "
+   "Оновлено ядер: "
    )
 MSG_HASH(
    MSG_NUM_CORES_LOCKED,
-   "пропущено ядер: "
+   "Пропущено ядер: "
    )
 MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
@@ -13788,6 +13816,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_CORE_DOES_NOT_SUPPORT_SAVESTATES,
    "Ядро не підтримує збереження станів."
+   )
+MSG_HASH(
+   MSG_CORE_DOES_NOT_SUPPORT_DISK_OPTIONS,
+   "Ядро не підтримує Керування Диском."
    )
 MSG_HASH(
    MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY,
@@ -13974,18 +14006,6 @@ MSG_HASH(
    "Не вдалося отримати псевдонім від клієнта."
    )
 MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Не вдалося завантажити"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Не вдалося завантажити вміст"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Не вдалося завантажити відеофайл"
-   )
-MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,
    "Не вдалося завантажити накладку."
    )
@@ -14128,6 +14148,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT,
    "Не сумісний з повтором"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE,
+   "Не вдалося завантажити майбутній стан під час відтворення"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE,
+   "Помилка: під час відтворення вибрано неправильну часову шкалу"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY,
+   "Неправильна часова шкала; запис буде перезаписано"
    )
 MSG_HASH(
    MSG_FOUND_SHADER,
@@ -14580,6 +14612,14 @@ MSG_HASH(
 MSG_HASH(
    MSG_PRESS_AGAIN_TO_QUIT,
    "Натисніть ще раз, щоб вийти..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_CLOSE_CONTENT,
+   "Натисніть ще раз, щоб закрити вміст…"
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_RESET,
+   "Натисніть ще раз, щоб скинути…"
    )
 MSG_HASH(
    MSG_TO,

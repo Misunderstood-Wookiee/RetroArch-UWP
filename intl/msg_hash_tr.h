@@ -867,6 +867,10 @@ MSG_HASH(
    "7zip Desteği"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Zstandard Desteği"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Dinamik Kütüphane Desteği"
    )
@@ -2118,6 +2122,14 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_NOTCH_WRITE_OVER,
    "Android ve iOS cihazlarda çentik üzerinde tam ekranı etkinleştir"
 )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Metal Argüman Arabelleklerini Kullan (Yeniden başlatılmalı)"
+)
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_USE_METAL_ARG_BUFFERS,
+   "Metal argüman arabelleklerini kullanarak performansı artırmayı deneyin. Bazı çekirdekler buna ihtiyaç duyabilir. Bu özellikle eski donanım veya işletim sistemi sürümlerinde bazı gölgelendiricileri bozabilir."
+)
 
 /* Settings > Video > CRT SwitchRes */
 
@@ -2317,11 +2329,11 @@ MSG_HASH(
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Tam Ekran Modunda Başlat"
+   "Tam Ekran Görüntüle"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Tam ekran ile başlayın. Çalışma zamanında değiştirilebilir. Bir komut satırı anahtarı ile geçersiz kılınabilir."
+   "Tam ekran olarak görüntüleyin. Çalışma zamanında değiştirilebilir. Komut satırı anahtarıyla geçersiz kılınabilir."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
@@ -3560,11 +3572,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Çıkışı Onayla"
+   "Çıkış/Kapat/Sıfırla Onaylaması"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "RetroArch üstünden çıkmak için çık tuşuna iki kez basılması gerekir."
+   "Çıkış/Kapat/Sıfırla için kısayol tuşuna iki kez basılması gerekiyor."
    )
 
 /* Settings > Input > Haptic Feedback/Vibration */
@@ -7812,6 +7824,10 @@ MSG_HASH(
    "Son Oynama:"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_PLAY_COUNT,
+   "Oynama Sayısı:"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_TIME_UNIT_SECONDS_SINGLE,
    "saniye"
    )
@@ -10133,6 +10149,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_CANCEL,
    "Mevcut oturum için zorlu kip başarımını devre dışı bırakır"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Zorlu Kipte Başarımlara Devam Etmeyi Kapat"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_REQUIRES_RELOAD,
+   "Zorlu Mod Başarımlarında devam etmek için çekirdeği yeniden çalıştırmalısınız"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_PAUSE,
@@ -13211,6 +13235,14 @@ MSG_HASH(
    "Veritabanı - Filtre: Edge Dergisi Değerlendirmesi"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_GENRE,
+   "Veritabanı - Filtre: Tür"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_REGION,
+   "Veritabanı - Filtre: Bölge"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_DATABASE_INFO,
    "Veritabanı Bilgisi"
    )
@@ -13607,11 +13639,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NUM_CORES_UPDATED,
-   "çekirdekler güncellendi: "
+   "Çekirdekler güncellendi: "
    )
 MSG_HASH(
    MSG_NUM_CORES_LOCKED,
-   "atlanan çekirdekler: "
+   "Atlanan çekirdekler: "
    )
 MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
@@ -13780,6 +13812,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_CORE_DOES_NOT_SUPPORT_SAVESTATES,
    "Çekirdek durum kayıtlarını desteklemiyor."
+   )
+MSG_HASH(
+   MSG_CORE_DOES_NOT_SUPPORT_DISK_OPTIONS,
+   "Çekirdek disk kontrolünü desteklemiyor."
    )
 MSG_HASH(
    MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY,
@@ -13967,15 +14003,15 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD,
-   "Yükleme başarısız"
+   "Yükleme başarısız."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_CONTENT,
-   "İçerik yükleme başarısız"
+   "İçerik yükleme başarısız."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Film dosyası yüklenemedi"
+   "Film dosyası yüklenemedi."
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,
@@ -14120,6 +14156,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT,
    "Tekrar oynatmayla uyumlu değil"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE,
+   "Oynatma sırasında gelecekteki durum yüklenemiyor"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE,
+   "Oynatma sırasında yanlış zaman çizelgesi hatası"
+   )
+MSG_HASH(
+   MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY,
+   "Yanlış zaman çizelgesi; kaydın üzerine yazılması"
    )
 MSG_HASH(
    MSG_FOUND_SHADER,
@@ -14572,6 +14620,14 @@ MSG_HASH(
 MSG_HASH(
    MSG_PRESS_AGAIN_TO_QUIT,
    "Çıkmak için tekrar basın..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_CLOSE_CONTENT,
+   "İçeriği kapatmak için tekrar basın..."
+   )
+MSG_HASH(
+   MSG_PRESS_AGAIN_TO_RESET,
+   "Sıfırlamak için tekrar basın..."
    )
 MSG_HASH(
    MSG_TO,
