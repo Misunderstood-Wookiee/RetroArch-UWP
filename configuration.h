@@ -322,6 +322,7 @@ typedef struct settings
       unsigned menu_screensaver_timeout;
       unsigned menu_screensaver_animation;
       unsigned menu_remember_selection;
+      unsigned menu_startup_page;
 
       unsigned playlist_entry_remove_enable;
       unsigned playlist_show_inline_core_name;
@@ -660,6 +661,7 @@ typedef struct settings
       bool video_notch_write_over_enable;
       bool video_hdr_enable;
       bool video_hdr_expand_gamut;
+      bool video_use_metal_arg_buffers;
 
       /* Accessibility */
       bool accessibility_enable;
@@ -717,6 +719,7 @@ typedef struct settings
       bool input_descriptor_label_show;
       bool input_descriptor_hide_unbound;
       bool input_all_users_control_menu;
+      bool input_menu_allow_tabs_back;
       bool input_menu_swap_ok_cancel_buttons;
       bool input_menu_swap_scroll_buttons;
       bool input_backtouch_enable;

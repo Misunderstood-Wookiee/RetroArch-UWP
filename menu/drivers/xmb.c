@@ -1167,53 +1167,51 @@ static void xmb_render_messagebox_internal(
    string_list_deinitialize(&list);
 }
 
-static char *xmb_path_dynamic_wallpaper(xmb_handle_t *xmb)
+static void xmb_path_dynamic_wallpaper(xmb_handle_t *xmb, char *s, size_t len)
 {
    settings_t *settings               = config_get_ptr();
    bool menu_dynamic_wallpaper_enable = settings->bools.menu_dynamic_wallpaper_enable;
    unsigned xmb_color_theme           = settings->uints.menu_xmb_color_theme;
    const char *path_menu_wallpaper    = settings->paths.path_menu_wallpaper;
    const char *dir_dynamic_wallpapers = settings->paths.directory_dynamic_wallpapers;
-   char path[PATH_MAX_LENGTH];
    unsigned depth                     = (unsigned)xmb_list_get_size(xmb, MENU_LIST_PLAIN);
-
-   path[0]                            = '\0';
 
    /* Do not update wallpaper in "Main Menu" playlists and inside playlist items */
    if (    (xmb->categories_selection_ptr == XMB_SYSTEM_TAB_MAIN && depth > 3)
         || (xmb->categories_selection_ptr > xmb->system_tab_end && depth > 1))
    {
-      if (string_is_empty(xmb->bg_file_path))
-         return NULL;
-      return strdup(xmb->bg_file_path);
+      if (!string_is_empty(xmb->bg_file_path))
+         strlcpy(s, xmb->bg_file_path, len);
+      return;
    }
 
    /* Dynamic wallpaper takes precedence as reset background,
     * then comes 'menu_wallpaper', and then iconset 'bg.png' */
    if (menu_dynamic_wallpaper_enable)
    {
-      size_t _len = fill_pathname_join_special(
-               path,
+      size_t _len = fill_pathname_join_special(s,
                dir_dynamic_wallpapers,
                xmb->title_name,
-               sizeof(path));
-      strlcpy(path + _len, ".png", sizeof(path) - _len);
+               len);
+      strlcpy(s + _len, ".png", len - _len);
    }
 
-   if (!string_is_empty(path) && path_is_valid(path))
+   if (!string_is_empty(s) && path_is_valid(s))
       ;/* no-op */
    else if (!string_is_empty(path_menu_wallpaper))
-      strlcpy(path, path_menu_wallpaper, sizeof(path));
+      strlcpy(s, path_menu_wallpaper, len);
    else if (xmb_color_theme == XMB_THEME_WALLPAPER)
-      fill_pathname_application_special(path, sizeof(path),
+      fill_pathname_application_special(s, len,
             APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB_BG);
-
-   return strdup(path);
 }
 
 static void xmb_update_dynamic_wallpaper(xmb_handle_t *xmb, bool reset)
 {
-   const char *path = xmb_path_dynamic_wallpaper(xmb);
+   char path[PATH_MAX_LENGTH];
+
+   path[0] = '\0';
+
+   xmb_path_dynamic_wallpaper(xmb, path, sizeof(path));
 
    if (!string_is_equal(path, xmb->bg_file_path) || reset)
    {
@@ -2795,14 +2793,14 @@ static void xmb_context_reset_horizontal_list(xmb_handle_t *xmb)
                sizeof(sysname));
          __len   = fill_pathname_join_special(texturepath, iconpath, sysname,
                sizeof(texturepath));
-         __len  += strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
+         strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
 
          /* If the playlist icon doesn't exist return default */
          if (!path_is_valid(texturepath))
          {
             __len  = fill_pathname_join_special(texturepath, iconpath, "default",
                   sizeof(texturepath));
-            __len += strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
+            strlcpy(texturepath + __len, ".png", sizeof(texturepath) - __len);
          }
 
          ti.width         = 0;
@@ -2924,13 +2922,6 @@ static void xmb_refresh_system_tabs_list(xmb_handle_t *xmb)
    if (settings->bools.menu_content_show_video)
       xmb->tabs[++xmb->system_tab_end] = XMB_SYSTEM_TAB_VIDEO;
 #endif
-
-#if 0 /* Move Netplay to Main Menu */
-#ifdef HAVE_NETWORKING
-   if (settings->bools.menu_content_show_netplay)
-      xmb->tabs[++xmb->system_tab_end] = XMB_SYSTEM_TAB_NETPLAY;
-#endif
-#endif /* 0 */
 
    if (      settings->uints.menu_content_show_add_entry == MENU_ADD_CONTENT_ENTRY_DISPLAY_PLAYLISTS_TAB
          && !settings->bools.kiosk_mode_enable)
@@ -3506,10 +3497,6 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_UPDATE_CHEATS:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_CHEATS:
          return xmb->textures.list[XMB_TEXTURE_CHEAT_OPTIONS];
-#if 0
-/* Thumbnailpack removal */
-      case MENU_ENUM_LABEL_THUMBNAILS_UPDATER_LIST:
-#endif
       case MENU_ENUM_LABEL_PL_THUMBNAILS_UPDATER_LIST:
       case MENU_ENUM_LABEL_DOWNLOAD_PL_ENTRY_THUMBNAILS:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_DOWNLOAD_THUMBNAILS:
@@ -5243,7 +5230,7 @@ static int xmb_draw_item(
       {
          xmb_node_t *sidebar_node = (xmb_node_t*)
                (xmb->horizontal_list.size)
-                  ? file_list_get_userdata_at_offset(&xmb->horizontal_list, list->list[i].entry_idx)
+                  ? (xmb_node_t*)file_list_get_userdata_at_offset(&xmb->horizontal_list, list->list[i].entry_idx)
                   : NULL;
 
          if (sidebar_node && sidebar_node->icon)
@@ -5259,17 +5246,22 @@ static int xmb_draw_item(
                {
                   /* Special fall-through for "Main Menu" > Playlists > History/Favorites */
                   char title[NAME_MAX_LENGTH];
+                  bool is_history = false;
+
                   menu_entries_get_title(title, sizeof(title));
-                  if (     string_is_equal(title, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_HISTORY))
-                        || string_is_equal(title, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GOTO_FAVORITES)))
-                     ; /* no-op */
-                  /* Force "Main Menu" playlists to use content icon while
-                   * inside the playlist content regardless of the option,
+                  is_history =
+                           string_is_equal(title, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_HISTORY))
+                        || string_is_equal(title, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GOTO_FAVORITES));
+
+                  /* Reset unknown file icon */
+                  if (is_history || xmb->is_quick_menu)
+                     texture = xmb->textures.list[XMB_TEXTURE_FILE];
+
+                  /* Force "Main Menu" playlists to use content icon
+                   * inside the playlist regardless of the option,
                    * since playlists themselves use the main icon */
-                  else if (xmb->depth == 4)
+                  if (!is_history && (xmb->is_quick_menu || xmb->depth > 2))
                      show_history_icons = PLAYLIST_SHOW_HISTORY_ICONS_CONTENT;
-                  else
-                     break;
                }
             case XMB_SYSTEM_TAB_HISTORY:
             case XMB_SYSTEM_TAB_FAVORITES:
@@ -5341,7 +5333,7 @@ static int xmb_draw_item(
 
          /* More active zoom */
          if (i == current)
-            gfx_icon_width = gfx_icon_height = (xmb->icon_size * 2.0f);
+            gfx_icon_height = (xmb->icon_size * 2.0f);
 
          /* More width room for non-squares */
          gfx_icon_width = (gfx_icon_height * 1.5f);
@@ -5855,7 +5847,7 @@ static enum menu_action xmb_parse_menu_entry_action(
                menu_st->selection_ptr = 0;
                xmb_selection_pointer_changed(xmb, true);
             }
-            else
+            else if (config_get_ptr()->bools.input_menu_allow_tabs_back)
             {
                /* Jump to Main Menu */
                size_t i           = 0;
@@ -5974,14 +5966,14 @@ static void xmb_layout_ps3(xmb_handle_t *xmb, int width)
    xmb->items_active_alpha       = 1.0f;
    xmb->items_passive_alpha      = 0.75f;
 
-   xmb->shadow_offset            = 4.0f * scale_factor;
+   xmb->shadow_offset            = 4.0f           * scale_factor;
    if (xmb->shadow_offset < 1.0)
       xmb->shadow_offset         = 1.0f;
    if (xmb->shadow_offset > 2.0)
       xmb->shadow_offset         = 2.0f;
 
    xmb->font_size                = new_font_size;
-   xmb->font2_size               = 22.0f         * scale_factor;
+   xmb->font2_size               = 22.0f          * scale_factor;
 
    /* Limit minimum font size */
    xmb->font_size                = (xmb->font_size  < 7) ? 7.0f : xmb->font_size;
@@ -6027,10 +6019,10 @@ static void xmb_layout_psp(xmb_handle_t *xmb, int width)
    xmb->items_active_zoom        = 1.0f;
    xmb->items_passive_zoom       = 0.5f;
 
-   xmb->categories_active_alpha  = 1.0;
-   xmb->categories_passive_alpha = 0.75;
-   xmb->items_active_alpha       = 1.0;
-   xmb->items_passive_alpha      = 0.75;
+   xmb->categories_active_alpha  = 1.0f;
+   xmb->categories_passive_alpha = 0.75f;
+   xmb->items_active_alpha       = 1.0f;
+   xmb->items_passive_alpha      = 0.75f;
 
    xmb->shadow_offset            = 4.0f           * scale_factor;
    if (xmb->shadow_offset < 1.0)
@@ -6042,24 +6034,23 @@ static void xmb_layout_psp(xmb_handle_t *xmb, int width)
    xmb->font2_size               = 18.0f          * scale_factor;
 
    /* Limit minimum font size */
-   xmb->font_size                = (xmb->font_size  < 7) ? 7 : xmb->font_size;
-   xmb->font2_size               = (xmb->font2_size < 6) ? 6 : xmb->font2_size;
+   xmb->font_size                = (xmb->font_size  < 7) ? 7.0f : xmb->font_size;
+   xmb->font2_size               = (xmb->font2_size < 6) ? 6.0f : xmb->font2_size;
 
-   xmb->cursor_size              = 64.0           * scale_factor;
-   xmb->icon_size                = 128.0          * scale_factor;
-   xmb->icon_spacing_horizontal  = 250.0          * scale_factor;
-   xmb->icon_spacing_vertical    = 82.0           * scale_factor;
+   xmb->cursor_size              = 64.0f          * scale_factor;
+   xmb->icon_size                = 128.0f         * scale_factor;
+   xmb->icon_spacing_horizontal  = 250.0f         * scale_factor;
+   xmb->icon_spacing_vertical    = 82.0f          * scale_factor;
 
    xmb->margins_screen_top       = (256 + 16)     * scale_factor;
-   xmb->margins_screen_left      = 136.0          * scale_factor;
+   xmb->margins_screen_left      = 136.0f         * scale_factor;
 
    xmb->margins_title_left       = (margins_title * scale_factor)
                                  + (4 * scale_factor)
                                  + (margins_title_h_offset * scale_factor);
    xmb->margins_title_top        = (margins_title * scale_factor)
                                  + (new_font_size - (new_font_size / 6) * scale_factor);
-   xmb->margins_title_bottom     = (margins_title * scale_factor)
-                                 + (4 * scale_factor);
+   xmb->margins_title_bottom     = (margins_title * scale_factor) + (4 * scale_factor);
 
    xmb->margins_label_left       = 85.0f          * scale_factor;
    xmb->margins_label_top        = new_font_size / 3.0f;
@@ -8738,7 +8729,7 @@ static void *xmb_init(void **userdata, bool video_is_threaded)
    xmb->textures_arrow_alpha          = 0;
    xmb->depth                         = 1;
    xmb->old_depth                     = 1;
-   xmb->alpha                         = 1.0f;
+   xmb->alpha                         = 0;
 
    xmb_refresh_system_tabs_list(xmb);
 
@@ -9205,7 +9196,7 @@ static void xmb_fade_in(xmb_handle_t *xmb)
 
    tag                     = (uintptr_t)&xmb->textures.bg;
 
-   anim_entry.duration     = XMB_DELAY;
+   anim_entry.duration     = XMB_DELAY * 1.25f;
    anim_entry.subject      = &xmb->alpha;
    anim_entry.easing_enum  = EASING_IN_QUINT;
    anim_entry.tag          = tag;

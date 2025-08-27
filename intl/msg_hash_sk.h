@@ -1736,14 +1736,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Spustiť v režime celej obrazovky"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Spustiť v režime na celú obrazovku. Môže byť zmenené počas behu. Môže byť prepísané prepínačom príkazového riadku."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "Maximalizované okno"
    )
@@ -2422,10 +2414,6 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_HOTKEY_BINDS,
    "Klávesové skratky"
    )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Potvrdiť ukončenie"
-   )
 
 /* Settings > Input > Haptic Feedback/Vibration */
 
@@ -2449,16 +2437,16 @@ MSG_HASH(
    "Zjednotené ovládanie ponuky"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_ALL_USERS_CONTROL_MENU,
+   "Všetci používatelia ovládajú ponuku"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_INFO_BUTTON,
    "Zakázať tlačidlo Info"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_SEARCH_BUTTON,
    "Zakázať tlačidlo Hľadať"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_INPUT_ALL_USERS_CONTROL_MENU,
-   "Všetci používatelia ovládajú ponuku"
    )
 
 /* Settings > Input > Hotkeys */
@@ -3113,15 +3101,17 @@ MSG_HASH(
 /* Settings > User Interface */
 
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_SETTINGS,
+   "Vzhľad"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_VIEWS_SETTINGS,
    "Viditeľnosť položky ponuky"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_SETTINGS,
-   "Vzhľad"
+   MENU_ENUM_LABEL_VALUE_QUIT_ON_CLOSE_CONTENT,
+   "Ukončiť pri zavretí obsahu"
    )
-#ifdef _3DS
-#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Zobraziť pokročilé nastavenia"
@@ -3131,8 +3121,12 @@ MSG_HASH(
    "Režim kiosku"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_ON_CLOSE_CONTENT,
-   "Ukončiť pri zavretí obsahu"
+   MENU_ENUM_LABEL_VALUE_MOUSE_ENABLE,
+   "Podpora myši"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_POINTER_ENABLE,
+   "Podpora dotyku"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SCREENSAVER_ANIMATION_SNOW,
@@ -3146,14 +3140,8 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SCREENSAVER_ANIMATION_VORTEX,
    "Vír"
    )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MOUSE_ENABLE,
-   "Podpora myši"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_POINTER_ENABLE,
-   "Podpora dotyku"
-   )
+#ifdef _3DS
+#endif
 
 /* Settings > User Interface > Menu Item Visibility */
 
@@ -6358,14 +6346,6 @@ MSG_HASH(
    "Kontrola jadra: "
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "aktualizované jadrá: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "preskočené jadrá: "
-   )
-MSG_HASH(
    MSG_AUDIO_MUTED,
    "Zvuk stlmený."
    )
@@ -6396,14 +6376,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_EXTRACTING,
    "Extrahujem"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Načítanie zlyhalo"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Obsah sa nepodarilo načítať"
    )
 MSG_HASH(
    MSG_FILE_NOT_FOUND,

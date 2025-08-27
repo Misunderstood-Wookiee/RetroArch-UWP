@@ -36,6 +36,15 @@
 #include "../../retroarch.h"
 #include "../../tasks/task_content.h"
 #include "../../verbosity.h"
+#include "../../core_info.h"
+
+#if HAVE_SWIFT
+#if TARGET_OS_TV
+#import "RetroArchTV-Swift.h"
+#else
+#import "RetroArch-Swift.h"
+#endif
+#endif
 
 #ifdef HAVE_MENU
 #include "../../menu/menu_setting.h"
@@ -127,13 +136,13 @@ static uintptr_t ui_companion_cocoatouch_get_app_icon_texture(const char *icon)
       UIImage *img = [UIImage imageNamed:iconName];
       if (!img)
       {
-         RARCH_LOG("could not load %s\n", icon);
+         RARCH_LOG("[Cocoa] Could not load %s.\n", icon);
          return 0;
       }
       NSData *png = UIImagePNGRepresentation(img);
       if (!png)
       {
-         RARCH_LOG("could not get png for %s\n", icon);
+         RARCH_LOG("[Cocoa] Could not get png for %s.\n", icon);
          return 0;
       }
 
@@ -610,12 +619,12 @@ enum
 
    if ([type unsignedIntegerValue] == AVAudioSessionInterruptionTypeBegan)
    {
-      RARCH_LOG("AudioSession Interruption Began\n");
+      RARCH_DBG("[Cocoa] AudioSession Interruption Began.\n");
       audio_driver_stop();
    }
    else if ([type unsignedIntegerValue] == AVAudioSessionInterruptionTypeEnded)
    {
-      RARCH_LOG("AudioSession Interruption Ended\n");
+      RARCH_DBG("[Cocoa] AudioSession Interruption Ended.\n");
       audio_driver_start(false);
    }
 }
@@ -675,10 +684,10 @@ enum
    rarch_setting_t *appicon_setting = menu_setting_find_enum(MENU_ENUM_LABEL_APPICON_SETTINGS);
    struct string_list *icons;
    if (               appicon_setting
-		   && uico_st->drv
-		   && uico_st->drv->get_app_icons
-		   && (icons = uico_st->drv->get_app_icons())
-		   && icons->size > 1)
+           && uico_st->drv
+           && uico_st->drv->get_app_icons
+           && (icons = uico_st->drv->get_app_icons())
+           && icons->size > 1)
    {
       int i;
       size_t _len    = 0;
@@ -704,6 +713,12 @@ enum
 
 #if TARGET_OS_TV
    update_topshelf();
+#endif
+
+#if HAVE_SWIFT
+   if (@available(iOS 16.0, tvOS 16.0, *)) {
+      [RetroArchAppShortcuts updateAppShortcuts];
+   }
 #endif
 
 #if TARGET_OS_IOS
@@ -805,6 +820,9 @@ enum
 
 -(BOOL)openRetroArchURL:(NSURL *)url
 {
+   RARCH_LOG("RetroArch URL received: %s\n", [[url absoluteString] UTF8String]);
+
+   // Handle topshelf URLs: retroarch://topshelf?path=...&core_path=...
    if ([url.host isEqualToString:@"topshelf"])
    {
       NSURLComponents *comp = [[NSURLComponents alloc] initWithURL:url resolvingAgainstBaseURL:NO];
@@ -823,11 +841,31 @@ enum
          return NO;
       fill_pathname_expand_special(path, [ns_path UTF8String], sizeof(path));
       fill_pathname_expand_special(core_path, [ns_core_path UTF8String], sizeof(core_path));
-      RARCH_LOG("TopShelf told us to open %s with %s\n", path, core_path);
+      RARCH_LOG("[Cocoa] TopShelf told us to open \"%s\" with \"%s\".\n", path, core_path);
       return task_push_load_content_with_new_core_from_companion_ui(core_path, path,
                                                                     NULL, NULL, NULL,
                                                                     &content_info, NULL, NULL);
    }
+
+   // Handle simple start URL: retroarch://start
+   if ([url.host isEqualToString:@"start"])
+   {
+      RARCH_LOG("App shortcut: just starting RetroArch\n");
+      return YES; // Just bring app to foreground
+   }
+
+   // Handle game launch URL: retroarch://game/filename
+   if ([url.host isEqualToString:@"game"])
+   {
+      NSString *filename = [url.path hasPrefix:@"/"] ? [url.path substringFromIndex:1] : url.path;
+      if (filename && filename.length > 0)
+      {
+         RARCH_LOG("App shortcut: launching game '%s'\n", [filename UTF8String]);
+         return cocoa_launch_game_by_filename(filename);
+      }
+   }
+
+   RARCH_LOG("Unknown RetroArch URL format: %s\n", [[url absoluteString] UTF8String]);
    return NO;
 }
 
@@ -893,7 +931,7 @@ enum
     for (MXMetricPayload *payload in payloads)
     {
         NSString *json = [[NSString alloc] initWithData:[payload JSONRepresentation] encoding:kCFStringEncodingUTF8];
-        RARCH_LOG("Got Metric Payload:\n%s\n", [json cStringUsingEncoding:kCFStringEncodingUTF8]);
+        RARCH_LOG("[Cocoa] Got Metric Payload:\n%s\n", [json cStringUsingEncoding:kCFStringEncodingUTF8]);
     }
 }
 
@@ -902,7 +940,7 @@ enum
     for (MXDiagnosticPayload *payload in payloads)
     {
         NSString *json = [[NSString alloc] initWithData:[payload JSONRepresentation] encoding:kCFStringEncodingUTF8];
-        RARCH_LOG("Got Diagnostic Payload:\n%s\n", [json cStringUsingEncoding:kCFStringEncodingUTF8]);
+        RARCH_LOG("[Cocoa] Got Diagnostic Payload:\n%s\n", [json cStringUsingEncoding:kCFStringEncodingUTF8]);
     }
 }
 
@@ -959,9 +997,9 @@ int main(int argc, char *argv[])
 {
 #if TARGET_OS_IOS
     if (jb_enable_ptrace_hack())
-        RARCH_LOG("Ptrace hack complete, JIT support is enabled.\n");
+        RARCH_LOG("[Cocoa] Ptrace hack complete, JIT support is enabled.\n");
     else
-        RARCH_WARN("Ptrace hack NOT available; Please use an app like Jitterbug.\n");
+        RARCH_WARN("[Cocoa] Ptrace hack NOT available; Please use an app like Jitterbug.\n");
 #endif
 #ifdef HAVE_SDL2
     SDL_SetMainReady();

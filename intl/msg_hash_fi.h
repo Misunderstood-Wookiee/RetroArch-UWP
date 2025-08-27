@@ -859,6 +859,10 @@ MSG_HASH(
    "7zip-tuki"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Zstandard-tuki"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
    "Dynaaminen kirjastotuki"
    )
@@ -2152,14 +2156,6 @@ MSG_HASH(
 /* Settings > Video > Fullscreen Mode */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_FULLSCREEN,
-   "Käynnistä koko näytön tilassa"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN,
-   "Käynnistä koko näytön tilassa. Voidaan muuttaa suorituksen aikana. Komentoriviargumentti voi ohittaa tämän."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_WINDOWED_FULLSCREEN,
    "Ikkunoitu koko näytön tila"
    )
@@ -2904,10 +2900,6 @@ MSG_HASH(
    )
 #endif
 #ifdef ANDROID
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_INPUT_SELECT_PHYSICAL_KEYBOARD,
-   "Valitse fyysinen näppäimistö"
-   )
 #endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SENSORS_ENABLE,
@@ -3082,14 +3074,6 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,
    "Android-yhteyden katkaisun kiertotapa"
    )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_PRESS_TWICE,
-   "Vahvista lopetus"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_QUIT_PRESS_TWICE,
-   "Vaadi Lopeta-pikanäppäintä painettavan kahdesti lopettaaksesi RetroArchin."
-   )
 
 /* Settings > Input > Haptic Feedback/Vibration */
 
@@ -3121,14 +3105,6 @@ MSG_HASH(
    "Käytä samoja kontrolleja sekä valikossa että pelissä. Koskee näppäimistöä."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_INFO_BUTTON,
-   "Poista tietopainike käytöstä"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_SEARCH_BUTTON,
-   "Poista hakupainike käytöstä"
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_INPUT_SWAP_OK_CANCEL,
    "Vaihda valikon OK- ja Peruuta-painikkeiden sijaintia"
    )
@@ -3151,6 +3127,30 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_ALL_USERS_CONTROL_MENU,
    "Salli kaikkien käyttäjien hallita valikkoa. Jos poistettu käytöstä, vain käyttäjä 1 voi hallita valikkoa."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_SCROLL_FAST,
+   "Valikon vierityksen kiihdytys"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_SCROLL_FAST,
+   "Kursorin suurin nopeus, kun painetaan vierittämisen suuntaa."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_SCROLL_DELAY,
+   "Valikon vierityksen viive"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_SCROLL_DELAY,
+   "Aloitusviive millisekunneissa, kun vierityksen suuntaa pidetään pohjassa."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_INFO_BUTTON,
+   "Poista tietopainike käytöstä"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_DISABLE_SEARCH_BUTTON,
+   "Poista hakupainike käytöstä"
    )
 
 /* Settings > Input > Hotkeys */
@@ -5053,14 +5053,6 @@ MSG_HASH(
 /* Settings > User Interface */
 
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_VIEWS_SETTINGS,
-   "Valikon kohteiden näkyvyys"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_VIEWS_SETTINGS,
-   "Vaihda valikon kohteiden näkyvyyttä RetroArchissa."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SETTINGS,
    "Ulkoasu"
    )
@@ -5069,19 +5061,57 @@ MSG_HASH(
    "Muuta valikon ulkoasun asetuksia."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_APPICON_SETTINGS,
-   "Sovelluksen kuvake"
+   MENU_ENUM_LABEL_VALUE_MENU_VIEWS_SETTINGS,
+   "Valikon kohteiden näkyvyys"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_APPICON_SETTINGS,
-   "Vaihda sovelluksen kuvake."
+   MENU_ENUM_SUBLABEL_MENU_VIEWS_SETTINGS,
+   "Vaihda valikon kohteiden näkyvyyttä RetroArchissa."
    )
-#ifdef _3DS
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_BOTTOM_SETTINGS,
-   "3DS:n alanäytön ulkonäkö"
+   MENU_ENUM_LABEL_VALUE_PAUSE_LIBRETRO,
+   "Keskeytä sisältö kun valikko on aktiivisena"
    )
-#endif
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PAUSE_NONACTIVE,
+   "Keskeytä sisältö, kun ikkuna ei ole aktiivinen"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_PAUSE_NONACTIVE,
+   "Keskeytä sisältö, kun RetroArch ei ole aktiivinen ikkuna."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_QUIT_ON_CLOSE_CONTENT,
+   "Lopeta suljettaessa sisältöä"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_QUIT_ON_CLOSE_CONTENT,
+   "Lopeta RetroArch automaattisesti suljettaessa sisältöä. 'CLI' sulkeutuu vain kun sisältö käynnistetään komentoriviltä."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_SAVESTATE_RESUME,
+   "Jatka sisältöä tilatallennusten käyttämisen jälkeen"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_SAVESTATE_RESUME,
+   "Sulje valikko automaattisesti ja jatka sisältöä tilan tallennuksen tai lataamisen jälkeen. Tämän ottaminen pois käytöstä, saattaa parantaa tallentamisen suorituskykyä hyvin hitailla laitteilla."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_INSERT_DISK_RESUME,
+   "Palaa sisältöön levyn vaihdon jälkeen"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_INSERT_DISK_RESUME,
+   "Sulje valikko automaattisesti ja jatka sisältöä uuden levyn lisäämisen tai latauksen jälkeen."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NAVIGATION_WRAPAROUND,
+   "Navigaation jatkuva läpikäynti"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NAVIGATION_WRAPAROUND,
+   "Palaa alkuun ja/tai loppuun, jos listan raja saavutetaan vaaka- tai pystysuunnassa."
+   )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Näytä lisäasetukset"
@@ -5107,40 +5137,28 @@ MSG_HASH(
    "Salasanan luominen kioskitilan käyttöön ottamisen yhteydessä mahdollistaa sen, että kioskitila voidaan myöhemmin poistaa käytöstä menemällä päävalikkoon, valitsemalla \"Kioskitila pois päältä\" ja syöttämällä salasanan."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_NAVIGATION_WRAPAROUND,
-   "Navigaation jatkuva läpikäynti"
+   MENU_ENUM_LABEL_VALUE_MOUSE_ENABLE,
+   "Hiirituki"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_NAVIGATION_WRAPAROUND,
-   "Palaa alkuun ja/tai loppuun, jos listan raja saavutetaan vaaka- tai pystysuunnassa."
+   MENU_ENUM_SUBLABEL_MOUSE_ENABLE,
+   "Salli valikon ohjaus hiiren avulla."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_PAUSE_LIBRETRO,
-   "Keskeytä sisältö kun valikko on aktiivisena"
+   MENU_ENUM_LABEL_VALUE_POINTER_ENABLE,
+   "Kosketustuki"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_SAVESTATE_RESUME,
-   "Jatka sisältöä tilatallennusten käyttämisen jälkeen"
+   MENU_ENUM_SUBLABEL_POINTER_ENABLE,
+   "Salli valikon ohjaus kosketusnäytön avulla."
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_SAVESTATE_RESUME,
-   "Sulje valikko automaattisesti ja jatka sisältöä tilan tallennuksen tai lataamisen jälkeen. Tämän ottaminen pois käytöstä, saattaa parantaa tallentamisen suorituskykyä hyvin hitailla laitteilla."
+   MENU_ENUM_LABEL_VALUE_THREADED_DATA_RUNLOOP_ENABLE,
+   "Säikeistetyt tehtävät"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_INSERT_DISK_RESUME,
-   "Palaa sisältöön levyn vaihdon jälkeen"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_INSERT_DISK_RESUME,
-   "Sulje valikko automaattisesti ja jatka sisältöä uuden levyn lisäämisen tai latauksen jälkeen."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_QUIT_ON_CLOSE_CONTENT,
-   "Lopeta suljettaessa sisältöä"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_QUIT_ON_CLOSE_CONTENT,
-   "Lopeta RetroArch automaattisesti suljettaessa sisältöä. 'CLI' sulkeutuu vain kun sisältö käynnistetään komentoriviltä."
+   MENU_ENUM_SUBLABEL_THREADED_DATA_RUNLOOP_ENABLE,
+   "Suorita tehtäviä erillisessä säikeessä."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SCREENSAVER_TIMEOUT,
@@ -5179,60 +5197,12 @@ MSG_HASH(
    "Säädä valikon näytönsäästäjän animaation nopeutta."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MOUSE_ENABLE,
-   "Hiirituki"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MOUSE_ENABLE,
-   "Salli valikon ohjaus hiiren avulla."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_POINTER_ENABLE,
-   "Kosketustuki"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_POINTER_ENABLE,
-   "Salli valikon ohjaus kosketusnäytön avulla."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_THREADED_DATA_RUNLOOP_ENABLE,
-   "Säikeistetyt tehtävät"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_THREADED_DATA_RUNLOOP_ENABLE,
-   "Suorita tehtäviä erillisessä säikeessä."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_PAUSE_NONACTIVE,
-   "Keskeytä sisältö, kun ikkuna ei ole aktiivinen"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_PAUSE_NONACTIVE,
-   "Keskeytä sisältö, kun RetroArch ei ole aktiivinen ikkuna."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_DISABLE_COMPOSITION,
    "Poista käytöstä työpöydän kompositointi"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_DISABLE_COMPOSITION,
    "Ikkunanhallintaohjelmat käyttävät koostamista toteuttaukseen visuaalisia tehosteita, havaitakseen reagoimattomia ikkunoita ja tehdäkseen muita asioita."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_SCROLL_FAST,
-   "Valikon vierityksen kiihdytys"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_SCROLL_FAST,
-   "Kursorin suurin nopeus, kun painetaan vierittämisen suuntaa."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_MENU_SCROLL_DELAY,
-   "Valikon vierityksen viive"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_SCROLL_DELAY,
-   "Aloitusviive millisekunneissa, kun vierityksen suuntaa pidetään pohjassa."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_UI_COMPANION_ENABLE,
@@ -5249,6 +5219,20 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_UI_COMPANION_TOGGLE,
    "Avaa työpöytävalikko käynnistettäessä"
+   )
+#ifdef _3DS
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_BOTTOM_SETTINGS,
+   "3DS:n alanäytön ulkonäkö"
+   )
+#endif
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_APPICON_SETTINGS,
+   "Sovelluksen kuvake"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_APPICON_SETTINGS,
+   "Vaihda sovelluksen kuvake."
    )
 
 /* Settings > User Interface > Menu Item Visibility */
@@ -12086,14 +12070,6 @@ MSG_HASH(
    "Kaikki tuetut ytimet vaihdettu play kaupan versioihin"
    )
 MSG_HASH(
-   MSG_NUM_CORES_UPDATED,
-   "ytimet päivitetty: "
-   )
-MSG_HASH(
-   MSG_NUM_CORES_LOCKED,
-   "ytimet ohitettu: "
-   )
-MSG_HASH(
    MSG_CORE_UPDATE_DISABLED,
    "Ydinpäivitys poistettu käytöstä - ydin on lukittu: "
    )
@@ -12436,18 +12412,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_GET_NICKNAME_FROM_CLIENT,
    "Nimimerkin saaminen asiakkaalta epäonnistui."
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD,
-   "Lataaminen epäonnistui"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_CONTENT,
-   "Sisällön lataaminen epäonnistui"
-   )
-MSG_HASH(
-   MSG_FAILED_TO_LOAD_MOVIE_FILE,
-   "Elokuvatiedoston lataaminen epäonnistui"
    )
 MSG_HASH(
    MSG_FAILED_TO_LOAD_OVERLAY,
