@@ -34,6 +34,10 @@
 #include "input_osk.h"
 #include "input_types.h"
 
+#ifdef HAVE_BSV_MOVIE
+#include "bsv/bsvmovie.h"
+#endif
+
 #ifdef HAVE_CHEEVOS
 #include "../cheevos/cheevos.h"
 #endif
@@ -58,15 +62,6 @@
 #include "../paths.h"
 #include "../performance_counters.h"
 #include "../retroarch.h"
-#ifdef HAVE_BSV_MOVIE
-#include "../tasks/task_content.h"
-#endif
-#if defined(HAVE_ZLIB) && defined(HAVE_BSV_MOVIE)
-#include <zlib.h>
-#endif
-#if defined(HAVE_ZSTD) && defined(HAVE_BSV_MOVIE)
-#include <zstd.h>
-#endif
 #include "../tasks/tasks_internal.h"
 #include "../verbosity.h"
 
@@ -516,6 +511,7 @@ bool input_driver_set_sensor(
          enum retro_sensor_action action, unsigned rate)
 {
    const input_driver_t *current_driver;
+   bool enabled = false;
 
    if (!input_driver_st.current_data)
       return false;
@@ -526,17 +522,19 @@ bool input_driver_set_sensor(
         || (action == RETRO_SENSOR_GYROSCOPE_ENABLE)
         || (action == RETRO_SENSOR_ILLUMINANCE_ENABLE)))
       return false;
-   if (   (current_driver = input_driver_st.current_driver)
+
+   if (input_driver_st.primary_joypad && input_driver_st.primary_joypad->set_sensor_state)
+      enabled = input_driver_st.primary_joypad->set_sensor_state(port, action, rate);
+
+   if (   !enabled
+       && (current_driver = input_driver_st.current_driver)
        &&  current_driver->set_sensor_state)
    {
       void *current_data = input_driver_st.current_data;
-      return current_driver->set_sensor_state(current_data,
+      enabled |= current_driver->set_sensor_state(current_data,
             port, action, rate);
    }
-   else if (input_driver_st.primary_joypad && input_driver_st.primary_joypad->set_sensor_state)
-      return input_driver_st.primary_joypad->set_sensor_state(NULL,
-            port, action, rate);
-   return false;
+   return enabled;
 }
 
 /**************************************/
@@ -544,18 +542,24 @@ bool input_driver_set_sensor(
 float input_driver_get_sensor(
          unsigned port, bool sensors_enable, unsigned id)
 {
+   if (!sensors_enable)
+      return 0.0f;
+
+   if (input_driver_st.primary_joypad && input_driver_st.primary_joypad->get_sensor_input)
+   {
+      float value;
+      /* if joypad driver's get_sensor_input returns false, let input driver try */
+      if (input_driver_st.primary_joypad->get_sensor_input(port, id, &value))
+         return value;
+   }
    if (input_driver_st.current_data)
    {
       const input_driver_t *current_driver = input_driver_st.current_driver;
-      if (sensors_enable && current_driver->get_sensor_input)
+      if (current_driver->get_sensor_input)
       {
          void *current_data = input_driver_st.current_data;
          return current_driver->get_sensor_input(current_data, port, id);
       }
-      else if (sensors_enable && input_driver_st.primary_joypad &&
-               input_driver_st.primary_joypad->get_sensor_input)
-         return input_driver_st.primary_joypad->get_sensor_input(NULL,
-               port, id);
    }
 
    return 0.0f;
@@ -1511,10 +1515,39 @@ static int16_t input_state_device(
 
             if (id <= RETRO_DEVICE_ID_JOYPAD_R3)
             {
-               /* Apply turbo button if activated. */
                uint8_t turbo_period     = settings->uints.input_turbo_period;
                uint8_t turbo_duty_cycle = settings->uints.input_turbo_duty_cycle;
                uint8_t turbo_mode       = settings->uints.input_turbo_mode;
+
+               /* Apply hold button logic.
+                * When hold modifier is pressed, tapping buttons toggles their held state.
+                * Held buttons report as pressed even when not physically touched.
+                * Physical presses pass through normally (no modification). */
+
+               /* Handle hold modifier state and toggle logic */
+               if (!input_st->hold_btns.frame_enable[port])
+               {
+                  /* Hold modifier not pressed - clear edge detection state */
+                  input_st->hold_btns.hold_pressed[port] = 0;
+               }
+               else
+               {
+                  /* Hold modifier is pressed - handle toggle on rising edge */
+                  if (!res)
+                     input_st->hold_btns.hold_pressed[port] &= ~(1 << id);
+                  else if (!(input_st->hold_btns.hold_pressed[port] & (1 << id)))
+                  {
+                     /* Rising edge - toggle hold for this button */
+                     input_st->hold_btns.hold_pressed[port] |= (1 << id);
+                     input_st->hold_btns.enable[port] ^= (1 << id);
+                  }
+               }
+
+               /* Apply hold effect: if button is held and not physically pressed */
+               if (!res && (input_st->hold_btns.enable[port] & (1 << id)))
+                  res = 1;
+
+               /* Apply turbo button if activated. */
 
                /* Don't allow classic mode turbo for D-pad unless explicitly allowed. */
                if (     turbo_mode <= INPUT_TURBO_MODE_CLASSIC_TOGGLE
@@ -1527,9 +1560,14 @@ static int16_t input_state_device(
                   turbo_duty_cycle = turbo_period / 2;
 
                /* Clear underlying button to prevent duplicates. */
-               if (     input_st->turbo_btns.frame_enable[port]
-                     && (int)id == settings->ints.input_turbo_bind)
-                  res = 0;
+               if (input_st->turbo_btns.frame_enable[port])
+               {
+                  int      turbo_bind = settings->ints.input_turbo_bind;
+                  unsigned remap_bind = settings->uints.input_remap_ids[port][turbo_bind];
+
+                  if (id == remap_bind)
+                     res = 0;
+               }
 
                if (turbo_mode > INPUT_TURBO_MODE_CLASSIC_TOGGLE)
                {
@@ -1704,6 +1742,18 @@ static int16_t input_state_device(
                            reset_state = true;
                         else if (settings->uints.input_remap_ids[port][offset + 1] != (offset+1))
                            reset_state = true;
+
+                        if (input_st->turbo_btns.frame_enable[port])
+                        {
+                           int      turbo_bind = settings->ints.input_turbo_bind;
+                           unsigned remap_bind = settings->uints.input_remap_ids[port][turbo_bind];
+
+                           if (offset == remap_bind || offset + 1 == remap_bind)
+                           {
+                              res = 0;
+                              break;
+                           }
+                        }
                      }
 
                      if (reset_state)
@@ -2911,6 +2961,40 @@ void input_overlay_load_active(
 }
 
 /**
+ * input_overlay_next_move_touch_masks
+ * @ol : Overlay handle.
+ * 
+ * Finds similar descs in the next overlay (i.e. same location and type)
+ * and moves touch masks from active overlay to next.
+ */
+void input_overlay_next_move_touch_masks(input_overlay_t *ol)
+{
+   const struct overlay *active = ol->active;
+   const struct overlay *next   = ol->overlays + ol->next_index;
+   size_t i, j;
+
+   for (i = 0; i < active->size; i++)
+   {
+      struct overlay_desc *desc = active->descs + i;
+
+      if (desc->old_touch_mask)
+      {
+         for (j = 0; j < next->size; j++)
+         {
+            struct overlay_desc *desc2 = next->descs + j;
+
+            if (     desc2->type == desc->type
+                  && fabs(desc2->x - desc->x) < 0.01f
+                  && fabs(desc2->y - desc->y) < 0.01f)
+               desc2->old_touch_mask = desc->old_touch_mask;
+         }
+
+         desc->old_touch_mask = 0;
+      }
+   }
+}
+
+/**
  * input_overlay_poll_clear:
  * @ol                    : overlay handle
  *
@@ -2968,6 +3052,20 @@ void input_overlay_set_alpha_mod(
    }
 }
 
+static void input_overlay_free_images(input_overlay_t *ol)
+{
+   size_t i;
+
+   if (!ol || !ol->images)
+      return;
+
+   for (i = 0; i < ol->num_images; i++)
+      image_texture_free(ol->images[i]);
+
+   free(ol->images);
+   ol->images = NULL;
+}
+
 static void input_overlay_free_overlays(input_overlay_t *ol)
 {
    size_t i;
@@ -2991,7 +3089,6 @@ void input_overlay_free_overlay(struct overlay *overlay)
 
    for (i = 0; i < overlay->size; i++)
    {
-      image_texture_free(&overlay->descs[i].image);
       if (overlay->descs[i].eightway_config)
          free(overlay->descs[i].eightway_config);
       overlay->descs[i].eightway_config = NULL;
@@ -3003,7 +3100,6 @@ void input_overlay_free_overlay(struct overlay *overlay)
    if (overlay->descs)
       free(overlay->descs);
    overlay->descs       = NULL;
-   image_texture_free(&overlay->image);
 }
 
 /**
@@ -3016,6 +3112,8 @@ static void input_overlay_free(input_overlay_t *ol)
 {
    if (!ol)
       return;
+
+   input_overlay_free_images(ol);
 
    input_overlay_free_overlays(ol);
 
@@ -3101,7 +3199,7 @@ void input_overlay_auto_rotate_(
 
 /**
  * input_overlay_poll_lightgun
- * @settings: pointer to settings
+ * @settings : pointer to settings
  * @ol : overlay handle
  * @old_ptr_count : previous poll's non-hitbox pointer count
  *
@@ -3221,8 +3319,10 @@ static void input_overlay_get_mouse_scale(settings_t *settings,
 
 /**
  * input_overlay_poll_mouse
- * @settings: pointer to settings
+ * @settings : pointer to settings
+ * @mouse_st : pointer to overlay mouse state
  * @ol : overlay handle
+ * @ptr_count : this poll's non-hitbox pointer count
  * @old_ptr_count : previous poll's non-hitbox pointer count
  *
  * Updates button state of the overlay mouse.
@@ -3233,15 +3333,16 @@ static void input_overlay_poll_mouse(settings_t *settings,
       const int ptr_count,
       const int old_ptr_count)
 {
-   input_overlay_pointer_state_t *ptr_st      = &ol->pointer_state;
-   const retro_time_t now_usec                = cpu_features_get_time_usec();
-   const retro_time_t hold_usec               = settings->uints.input_overlay_mouse_hold_msec * 1000;
-   const retro_time_t dtap_usec               = settings->uints.input_overlay_mouse_dtap_msec * 1000;
-   int swipe_thres_x                          = 0;
-   int swipe_thres_y                          = 0;
-   const bool hold_to_drag                    = settings->bools.input_overlay_mouse_hold_to_drag;
-   const bool dtap_to_drag                    = settings->bools.input_overlay_mouse_dtap_to_drag;
-   bool want_feedback                         = false;
+   input_overlay_pointer_state_t *ptr_st = &ol->pointer_state;
+   const retro_time_t now_usec           = cpu_features_get_time_usec();
+   const retro_time_t hold_usec          = settings->uints.input_overlay_mouse_hold_msec * 1000;
+   const retro_time_t dtap_usec          = settings->uints.input_overlay_mouse_dtap_msec * 1000;
+   const uint8_t alt_2touch              = settings->uints.input_overlay_mouse_alt_two_touch_input;
+   int swipe_thres_x                     = 0;
+   int swipe_thres_y                     = 0;
+   const bool hold_to_drag               = settings->bools.input_overlay_mouse_hold_to_drag;
+   const bool dtap_to_drag               = settings->bools.input_overlay_mouse_dtap_to_drag;
+   bool want_feedback                    = false;
    bool is_swipe, is_brief, is_long;
 
    static retro_time_t start_usec;
@@ -3254,8 +3355,10 @@ static void input_overlay_poll_mouse(settings_t *settings,
    static int y_start;
    static int peak_ptr_count;
    static int old_peak_ptr_count;
-   static bool skip_buttons;
+   static bool check_gestures;
    static bool pending_click;
+   static const uint8_t btns[OVERLAY_MAX_TOUCH + 1] =
+         {0x0, 0x1, 0x2, 0x4};  /* none, lmb, rmb, mmb */
 
    input_overlay_get_mouse_scale(settings,
          (float*)&mouse_st->scale_x, &mouse_st->scale_y,
@@ -3276,6 +3379,11 @@ static void input_overlay_poll_mouse(settings_t *settings,
          /* Pointer added */
          peak_ptr_count = ptr_count;
          start_usec     = now_usec;
+
+         /* Alt 2-touch input. After gesture checks,
+          * use 2nd touch as a button */
+         if (!check_gestures && ptr_count == 2)
+            mouse_st->hold = btns[alt_2touch];
       }
       else
       {
@@ -3293,7 +3401,7 @@ static void input_overlay_poll_mouse(settings_t *settings,
    is_long  = (now_usec - start_usec) > (hold_to_drag ? hold_usec : 250000);
 
    /* Check if new button input should be created */
-   if (!skip_buttons)
+   if (check_gestures)
    {
       if (!is_swipe)
       {
@@ -3301,7 +3409,7 @@ static void input_overlay_poll_mouse(settings_t *settings,
                && is_long && ptr_count && !mouse_st->hold)
          {
             /* Long press */
-            mouse_st->hold = (1 << (ptr_count - 1));
+            mouse_st->hold = btns[ptr_count];
             want_feedback  = true;
          }
          else if (is_brief)
@@ -3311,7 +3419,7 @@ static void input_overlay_poll_mouse(settings_t *settings,
                /* New input. Check for double tap */
                if (     dtap_to_drag
                      && now_usec - last_up_usec < dtap_usec)
-                  mouse_st->hold = (1 << (old_peak_ptr_count - 1));
+                  mouse_st->hold = btns[old_peak_ptr_count];
 
                last_down_usec = now_usec;
             }
@@ -3327,7 +3435,7 @@ static void input_overlay_poll_mouse(settings_t *settings,
                }
                else
                {
-                  mouse_st->click    = (1 << (peak_ptr_count - 1));
+                  mouse_st->click    = btns[peak_ptr_count];
                   click_end_usec     = now_usec + click_dur_usec;
                }
 
@@ -3337,14 +3445,19 @@ static void input_overlay_poll_mouse(settings_t *settings,
       }
       else
       {
-         /* If dragging 2+ fingers, hold RMB or MMB */
+         /* Swiping. Stop gesture checks and possibly hold a button */
          if (ptr_count > 1)
          {
-            mouse_st->hold = (1 << (ptr_count - 1));
-            if (hold_to_drag)
+            if (hold_to_drag && !alt_2touch)
+            {
+               mouse_st->hold = btns[ptr_count];
                want_feedback = true;
+            }
+            else if (alt_2touch && !hold_to_drag
+                  && ptr_count == 2)
+               mouse_st->hold = btns[alt_2touch];
          }
-         skip_buttons = true;
+         check_gestures = false;
       }
    }
 
@@ -3357,9 +3470,9 @@ static void input_overlay_poll_mouse(settings_t *settings,
    }
 
    if (!ptr_count)
-      skip_buttons = false; /* Reset button checks  */
+      check_gestures = true;
    else if (is_long)
-      skip_buttons = true;  /* End of button checks */
+      check_gestures = false;
 
    /* Remove stale clicks */
    if (mouse_st->click && now_usec > click_end_usec)
@@ -3498,6 +3611,7 @@ static void input_poll_overlay(
    input_overlay_state_t old_ol_state;
    int i, j;
    input_overlay_t *ol                      = (input_overlay_t*)ol_data;
+   int blocked_touch_idx                    = -1;
    uint16_t key_mod                         = 0;
    uint16_t ptrdev_touch_mask               = 0;
    uint16_t hitbox_touch_mask               = 0;
@@ -3516,6 +3630,7 @@ static void input_poll_overlay(
    bool osk_state_changed                   = false;
 
    static int old_ptr_count;
+   static int old_blocked_touch_idx;
    static int16_t old_ptrdev_touch_mask;
    static int16_t old_hitbox_touch_mask;
 
@@ -3603,14 +3718,24 @@ static void input_poll_overlay(
          int old_i           = input_st->old_touch_index_lut[i];
          bool hitbox_pressed = false;
 
-         /* Keep each touch pointer dedicated to the same input type
-          * (hitbox or pointing device) from the previous poll */
          if (old_i != -1)
          {
+            /* Keep each touch pointer dedicated to the same input type
+             * (hitbox or pointing device) from the previous poll */
             if (BIT16_GET(old_hitbox_touch_mask, old_i))
                BIT16_SET(hitbox_touch_mask, i);
             else if (BIT16_GET(old_ptrdev_touch_mask, old_i))
                BIT16_SET(ptrdev_touch_mask, i);
+
+            /* Skip blocked touch pointer and freeze any overlay_next
+             * input until the blocked touch is removed */
+            if (old_i == old_blocked_touch_idx)
+            {
+               blocked_touch_idx = i;
+               if (BIT256_GET(old_ol_state.buttons, RARCH_OVERLAY_NEXT))
+                  BIT256_SET(ol_state->buttons, RARCH_OVERLAY_NEXT);
+               continue;
+            }
          }
 
          memset(&polled_data, 0, sizeof(struct input_overlay_state));
@@ -3627,6 +3752,10 @@ static void input_poll_overlay(
 
          if (hitbox_pressed)
          {
+            /* Block touch pointer if overlay_next was pressed */
+            if (BIT256_GET(polled_data.buttons, RARCH_OVERLAY_NEXT))
+               blocked_touch_idx = i;
+
             bits_or_bits(ol_state->buttons.data,
                   polled_data.buttons.data,
                   ARRAY_SIZE(polled_data.buttons.data));
@@ -3775,8 +3904,7 @@ static void input_poll_overlay(
    if (     current_input->keypress_vibrate
          && settings->bools.vibrate_on_keypress
          && ol_state->touch_count
-         && ol_state->touch_count >= old_ol_state.touch_count
-         && !(ol->flags & INPUT_OVERLAY_BLOCKED))
+         && ol_state->touch_count >= old_ol_state.touch_count)
    {
       if (     osk_state_changed
             || bits_any_different(
@@ -3789,6 +3917,7 @@ static void input_poll_overlay(
 
    old_hitbox_touch_mask  = hitbox_touch_mask;
    old_ptrdev_touch_mask  = ptrdev_touch_mask;
+   old_blocked_touch_idx  = blocked_touch_idx;
    ptr_state->device_mask = 0;
 }
 #endif
@@ -3937,7 +4066,7 @@ size_t input_config_get_bind_string(
 
    /*completely empty?*/
    if (*s == '\0')
-      _len += strlcpy(s + _len, "---", len - _len);
+      _len += strlcpy(s + _len, RARCH_NO_BIND, len - _len);
    return _len;
 }
 
@@ -3987,6 +4116,9 @@ size_t input_config_get_bind_string_joykey(
       _len  = strlcpy(s, "Button ", len);
       _len += snprintf(s + _len, len - _len, "%u",
             (unsigned)bind->joykey);
+
+      if (!string_is_empty(suffix))
+         _len += snprintf(s + _len, len - _len, " %s", suffix);
    }
    return _len;
 }
@@ -4525,8 +4657,14 @@ void joypad_driver_reinit(void *data, const char *joypad_driver_name)
  **/
 float input_get_sensor_state(unsigned port, unsigned id)
 {
-   bool input_sensors_enable              = config_get_ptr()->bools.input_sensors_enable;
-   return input_driver_get_sensor(port, input_sensors_enable, id);
+   settings_t *settings      = config_get_ptr();
+   bool input_sensors_enable = settings->bools.input_sensors_enable;
+   float sensitivity         = 1.0f;
+   if (id >= RETRO_SENSOR_ACCELEROMETER_X && id <= RETRO_SENSOR_ACCELEROMETER_Z)
+      sensitivity = settings->floats.input_sensor_accelerometer_sensitivity;
+   else if (id >= RETRO_SENSOR_GYROSCOPE_X && id <= RETRO_SENSOR_GYROSCOPE_Z)
+      sensitivity = settings->floats.input_sensor_gyroscope_sensitivity;
+   return input_driver_get_sensor(port, input_sensors_enable, id) * sensitivity;
 }
 
 /**
@@ -5000,7 +5138,10 @@ void input_config_set_mouse_display_name(unsigned port, const char *name)
 
    /* Strip non-ASCII characters */
    if (!string_is_empty(name))
+   {
       string_copy_only_ascii(name_ascii, name);
+      string_trim_whitespace(name_ascii);
+   }
 
    if (!string_is_empty(name_ascii))
       strlcpy(input_st->input_mouse_info[port].display_name, name_ascii,
@@ -5353,6 +5494,25 @@ void input_overlay_check_mouse_cursor(void)
    }
 }
 
+static void input_overlay_loaded_move_images(input_overlay_t *ol,
+      struct string_list *image_list)
+{
+   size_t i;
+
+   ol->images = malloc(ol->num_images * sizeof(struct texture_image *));
+
+   if (!ol->images)
+   {
+      for (i = 0; i < ol->num_images; i++)
+         image_texture_free(image_list->elems[i].attr.p);
+      ol->num_images = 0;
+      RARCH_ERR("[Overlay] Couldn't allocate images array.\n");
+   }
+
+   for (i = 0; i < ol->num_images; i++)
+      ol->images[i] = (struct texture_image*)image_list->elems[i].attr.p;
+}
+
 /* task_data = overlay_task_data_t* */
 static void input_overlay_loaded(retro_task_t *task,
       void *task_data, void *user_data, const char *err)
@@ -5374,6 +5534,7 @@ static void input_overlay_loaded(retro_task_t *task,
    ol->size        = data->size;
    ol->active      = data->active;
    ol->path        = data->overlay_path;
+   ol->num_images  = data->image_list->size;
    ol->next_index  = (unsigned)((ol->index + 1) % ol->size);
    ol->flags      |= INPUT_OVERLAY_ALIVE;
    if (data->flags & OVERLAY_LOADER_IS_OSK)
@@ -5381,6 +5542,10 @@ static void input_overlay_loaded(retro_task_t *task,
 #ifdef HAVE_MENU
    overlay_types   = data->overlay_types;
 #endif
+
+   if (ol->num_images > 0)
+      input_overlay_loaded_move_images(ol, data->image_list);
+   string_list_free(data->image_list);
 
    free(data);
 
@@ -5407,6 +5572,9 @@ static void input_overlay_loaded(retro_task_t *task,
       input_overlay_unload();
 
    input_overlay_set_eightway_diagonal_sensitivity();
+
+   /* Trigger viewport recalculation - overlay may have viewport override */
+   command_event(CMD_EVENT_VIDEO_SET_ASPECT_RATIO, NULL);
 
 #ifdef HAVE_MENU
    /* Update menu entries if this is the main overlay */
@@ -5611,6 +5779,7 @@ static bool input_keys_pressed_other_sources(
  */
 static void input_keys_pressed(
       unsigned port,
+      unsigned hotkey_port,
       bool is_menu,
       unsigned input_hotkey_block_delay,
       input_bits_t *p_new_state,
@@ -5623,17 +5792,19 @@ static void input_keys_pressed(
       bool input_hotkey_device_merge)
 {
    unsigned i;
+   /* Autoconf binds are indexed by joy_idx, not frontend port */
+   unsigned joy_idx               = joypad_info->joy_idx;
    int32_t ret                    = 0;
    input_driver_state_t *input_st = &input_driver_st;
    bool block_hotkey[RARCH_BIND_LIST_END];
    bool any_pressed               = false;
    bool libretro_hotkey_set       =
-            binds[port][RARCH_ENABLE_HOTKEY].joykey                 != NO_BTN
-         || binds[port][RARCH_ENABLE_HOTKEY].joyaxis                != AXIS_NONE
-         || input_autoconf_binds[port][RARCH_ENABLE_HOTKEY].joykey  != NO_BTN
-         || input_autoconf_binds[port][RARCH_ENABLE_HOTKEY].joyaxis != AXIS_NONE;
+            binds_norm->joykey  != NO_BTN
+         || binds_norm->joyaxis != AXIS_NONE
+         || binds_auto->joykey  != NO_BTN
+         || binds_auto->joyaxis != AXIS_NONE;
    bool keyboard_hotkey_set       =
-         binds[port][RARCH_ENABLE_HOTKEY].key != RETROK_UNKNOWN;
+         binds_norm->key != RETROK_UNKNOWN;
 
    if (!binds)
       return;
@@ -5642,7 +5813,8 @@ static void input_keys_pressed(
          && (libretro_hotkey_set || keyboard_hotkey_set))
       libretro_hotkey_set = keyboard_hotkey_set = true;
 
-   if (     binds[port][RARCH_ENABLE_HOTKEY].valid
+   if (     (port == hotkey_port)
+         && (binds_norm->valid || binds_auto->valid)
          && CHECK_INPUT_DRIVER_BLOCK_HOTKEY(binds_norm, binds_auto))
    {
       if (input_state_wrap(
@@ -5664,12 +5836,14 @@ static void input_keys_pressed(
       else
          input_st->flags |= INP_FLAG_BLOCK_HOTKEY;
    }
-
+      
+#ifdef HAVE_MENU
    /* Prevent triggering menu actions after binding */
    if (     !(input_st->flags & INP_FLAG_MENU_PRESS_PENDING)
          && menu_state_get_ptr()->input_driver_flushing_input)
       input_st->flags |= INP_FLAG_WAIT_INPUT_RELEASE;
-
+#endif
+   
    /* Check libretro input if emulated device type is active,
     * except device type must be always active in menu. */
    if (     !(input_st->flags & INP_FLAG_BLOCK_LIBRETRO_INPUT)
@@ -5702,10 +5876,10 @@ static void input_keys_pressed(
     * unless 'enable_hotkey' is set in autoconf. */
    if (     !any_pressed
          && !(input_st->flags & INP_FLAG_WAIT_INPUT_RELEASE)
-         && (input_autoconf_binds[port][RARCH_MENU_TOGGLE].joykey != NO_BTN)
-         && (  input_autoconf_binds[port][RARCH_ENABLE_HOTKEY].joykey == input_autoconf_binds[port][RARCH_MENU_TOGGLE].joykey
-            || input_autoconf_binds[port][RARCH_ENABLE_HOTKEY].joykey == NO_BTN)
-         && (  binds[port][RARCH_MENU_TOGGLE].joykey == input_autoconf_binds[port][RARCH_MENU_TOGGLE].joykey
+         && (input_autoconf_binds[joy_idx][RARCH_MENU_TOGGLE].joykey != NO_BTN)
+         && (  input_autoconf_binds[joy_idx][RARCH_ENABLE_HOTKEY].joykey == input_autoconf_binds[joy_idx][RARCH_MENU_TOGGLE].joykey
+            || input_autoconf_binds[joy_idx][RARCH_ENABLE_HOTKEY].joykey == NO_BTN)
+         && (  binds[port][RARCH_MENU_TOGGLE].joykey == input_autoconf_binds[joy_idx][RARCH_MENU_TOGGLE].joykey
             || binds[port][RARCH_MENU_TOGGLE].joykey == NO_BTN))
    {
       /* Ignore keyboard menu toggle button and check
@@ -5740,7 +5914,12 @@ static void input_keys_pressed(
          if (     bit_pressed
                || BIT64_GET(lifecycle_state, i)
                || input_keys_pressed_other_sources(input_st, i, p_new_state))
+         {
+            if (!(input_st->flags & INP_FLAG_MENU_PRESS_PENDING))
+               input_st->flags &= ~INP_FLAG_MENU_PRESS_CANCEL;
+
             input_st->flags |= INP_FLAG_MENU_PRESS_PENDING;
+         }
          else if (input_st->flags & INP_FLAG_MENU_PRESS_PENDING)
             /* Also set 'enable_hotkey' to prevent hotkey delay untrigger */
             BIT256_SET_PTR(p_new_state, RARCH_ENABLE_HOTKEY);
@@ -5771,8 +5950,8 @@ static void input_keys_pressed(
          BIT256_SET_PTR(p_new_state, RARCH_ENABLE_HOTKEY);
    }
 
-   /* Hotkeys are only relevant for first port */
-   if (port > 0)
+   /* Hotkeys are only relevant for the first user or core port */
+   if (port != hotkey_port)
       return;
 
    /* Check hotkeys to block keyboard and joypad hotkeys separately.
@@ -5975,880 +6154,6 @@ static void input_keys_pressed(
       input_st->input_hotkey_block_counter = 0;
 }
 
-#ifdef HAVE_BSV_MOVIE
-/* Forward declaration */
-void bsv_movie_free(bsv_movie_t*);
-
-void bsv_movie_enqueue(input_driver_state_t *input_st,
-      bsv_movie_t * state, enum bsv_flags flags)
-{
-   if (input_st->bsv_movie_state_next_handle)
-      bsv_movie_free(input_st->bsv_movie_state_next_handle);
-   input_st->bsv_movie_state_next_handle    = state;
-   input_st->bsv_movie_state.flags          = flags;
-}
-
-void bsv_movie_deinit(input_driver_state_t *input_st)
-{
-   if (input_st->bsv_movie_state_handle)
-      bsv_movie_free(input_st->bsv_movie_state_handle);
-   input_st->bsv_movie_state_handle = NULL;
-}
-
-void bsv_movie_deinit_full(input_driver_state_t *input_st)
-{
-   bsv_movie_deinit(input_st);
-   if (input_st->bsv_movie_state_next_handle)
-      bsv_movie_free(input_st->bsv_movie_state_next_handle);
-   input_st->bsv_movie_state_next_handle = NULL;
-}
-
-void bsv_movie_frame_rewind(void)
-{
-   input_driver_state_t *input_st = &input_driver_st;
-   bsv_movie_t         *handle    = input_st->bsv_movie_state_handle;
-   bool recording = (input_st->bsv_movie_state.flags
-         & BSV_FLAG_MOVIE_RECORDING) ? true : false;
-
-   if (!handle)
-      return;
-
-   handle->did_rewind = true;
-
-   if (     ( (handle->frame_counter & handle->frame_mask) <= 1)
-         && (handle->frame_pos[0] == handle->min_file_pos))
-   {
-      /* If we're at the beginning... */
-      handle->frame_counter = 0;
-      intfstream_seek(handle->file, (int)handle->min_file_pos, SEEK_SET);
-      if (recording)
-         intfstream_truncate(handle->file, (int)handle->min_file_pos);
-      else
-         bsv_movie_read_next_events(handle);
-   }
-   else
-   {
-      /* First time rewind is performed, the old frame is simply replayed.
-       * However, playing back that frame caused us to read data, and push
-       * data to the ring buffer.
-       *
-       * Successively rewinding frames, we need to rewind past the read data,
-       * plus another. */
-      uint8_t delta = handle->first_rewind ? 1 : 2;
-      if (handle->frame_counter >= delta)
-         handle->frame_counter -= delta;
-      else
-         handle->frame_counter = 0;
-      intfstream_seek(handle->file, (int)handle->frame_pos[handle->frame_counter & handle->frame_mask], SEEK_SET);
-      if (recording)
-         intfstream_truncate(handle->file, (int)handle->frame_pos[handle->frame_counter & handle->frame_mask]);
-      else
-         bsv_movie_read_next_events(handle);
-   }
-
-   if (intfstream_tell(handle->file) <= (long)handle->min_file_pos)
-   {
-      /* We rewound past the beginning. */
-
-      if (handle->playback)
-      {
-         intfstream_seek(handle->file, (int)handle->min_file_pos, SEEK_SET);
-         bsv_movie_read_next_events(handle);
-      }
-      else
-      {
-         retro_ctx_serialize_info_t serial_info;
-
-         /* If recording, we simply reset
-          * the starting point. Nice and easy. */
-
-         intfstream_seek(handle->file, 6 * sizeof(uint32_t), SEEK_SET);
-         intfstream_truncate(handle->file, 6 * sizeof(uint32_t));
-
-         serial_info.data = handle->state;
-         serial_info.size = handle->state_size;
-
-         core_serialize(&serial_info);
-
-         intfstream_write(handle->file, handle->state, handle->state_size);
-      }
-   }
-}
-
-void bsv_movie_handle_push_key_event(bsv_movie_t *movie,
-      uint8_t down, uint16_t mod, uint32_t code, uint32_t character)
-{
-   bsv_key_data_t data;
-   data.down                                 = down;
-   data._padding                             = 0;
-   data.mod                                  = swap_if_big16(mod);
-   data.code                                 = swap_if_big32(code);
-   data.character                            = swap_if_big32(character);
-   movie->key_events[movie->key_event_count] = data;
-   movie->key_event_count++;
-}
-
-void bsv_movie_handle_push_input_event(bsv_movie_t *movie,
-     uint8_t port, uint8_t dev, uint8_t idx, uint16_t id, int16_t val)
-{
-   bsv_input_data_t data;
-   data.port                          = port;
-   data.device                        = dev;
-   data.idx                           = idx;
-   data._padding                      = 0;
-   data.id                            = swap_if_big16(id);
-   data.value                         = swap_if_big16(val);
-   movie->input_events[movie->input_event_count] = data;
-   movie->input_event_count++;
-}
-
-bool bsv_movie_handle_read_input_event(bsv_movie_t *movie,
-     uint8_t port, uint8_t dev, uint8_t idx, uint16_t id, int16_t* val)
-{
-   int i;
-   /* if movie is old, just read two bytes and hope for the best */
-   if (movie->version == 0)
-   {
-      int64_t read = intfstream_read(movie->file, val, 2);
-      *val         = swap_if_big16(*val);
-      return (read == 2);
-   }
-   for (i = 0; i < movie->input_event_count; i++)
-   {
-      bsv_input_data_t evt = movie->input_events[i];
-      if (   (evt.port   == port)
-          && (evt.device == dev)
-          && (evt.idx    == idx)
-          && (evt.id     == id))
-      {
-         *val = swap_if_big16(evt.value);
-         return true;
-      }
-   }
-   return false;
-}
-
-void bsv_movie_finish_rewind(input_driver_state_t *input_st)
-{
-   bsv_movie_t *handle    = input_st->bsv_movie_state_handle;
-   if (!handle)
-      return;
-   handle->frame_counter += 1;
-   handle->first_rewind   = !handle->did_rewind;
-   handle->did_rewind     = false;
-}
-
-bool bsv_movie_load_checkpoint(bsv_movie_t *handle, uint8_t compression, uint8_t encoding)
-{
-#ifdef HAVE_ZSTD
-   size_t uncompressed_size_big;
-#endif
-   retro_ctx_serialize_info_t serial_info;
-   input_driver_state_t *input_st = input_state_get_ptr();
-   uint32_t compressed_encoded_size, encoded_size, size;
-   uint8_t *compressed_data = NULL;
-   uint8_t *encoded_data    = NULL;
-   uint8_t *state           = NULL;
-   bool ret                 = true;
-
-   if (intfstream_read(handle->file, &(size),
-               sizeof(uint32_t)) != sizeof(uint32_t))
-   {
-      RARCH_ERR("[Replay] Replay truncated before uncompressed unencoded size\n");
-      ret = false;
-      goto exit;
-   }
-   if (intfstream_read(handle->file, &(encoded_size),
-               sizeof(uint32_t)) != sizeof(uint32_t))
-   {
-      RARCH_ERR("[Replay] Replay truncated before uncompressed encoded size\n");
-      ret = false;
-      goto exit;
-   }
-   if (intfstream_read(handle->file, &(compressed_encoded_size),
-               sizeof(uint32_t)) != sizeof(uint32_t))
-   {
-      RARCH_ERR("[Replay] Replay truncated before compressed encoded size\n");
-      ret = false;
-      goto exit;
-   }
-   size                    = swap_if_big32(size);
-   encoded_size            = swap_if_big32(encoded_size);
-   compressed_encoded_size = swap_if_big32(compressed_encoded_size);
-   compressed_data         = (uint8_t*)malloc(compressed_encoded_size);
-   if (intfstream_read(handle->file, compressed_data, compressed_encoded_size) != (int64_t)compressed_encoded_size)
-   {
-      RARCH_ERR("[Replay] Truncated checkpoint, terminating movie\n");
-      input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-      ret = false;
-      goto exit;
-   }
-   switch (compression)
-   {
-      case REPLAY_CHECKPOINT2_COMPRESSION_NONE:
-         encoded_data    = compressed_data;
-         compressed_data = NULL;
-         break;
-#ifdef HAVE_ZLIB
-      case REPLAY_CHECKPOINT2_COMPRESSION_ZLIB:
-         {
-#ifdef EMSCRIPTEN
-            uLongf uncompressed_size_zlib = encoded_size;
-#else
-            uint32_t uncompressed_size_zlib = encoded_size;
-#endif
-            encoded_data = (uint8_t*)calloc(encoded_size, sizeof(uint8_t));
-            if (uncompress(encoded_data, &uncompressed_size_zlib, compressed_data, compressed_encoded_size) != Z_OK)
-            {
-               ret = false;
-               goto exit;
-            }
-            break;
-         }
-#endif
-#ifdef HAVE_ZSTD
-      case REPLAY_CHECKPOINT2_COMPRESSION_ZSTD:
-         /* TODO: figure out how to support in-place decompression to
-            avoid allocating a second buffer; would need to allocate
-            the compressed_data buffer to be decompressed size +
-            margin.  but, how could the margin be known without
-            calling the function that takes the compressed frames as
-            an input?  */
-         encoded_data = (uint8_t*)calloc(encoded_size, sizeof(uint8_t));
-         uncompressed_size_big = ZSTD_decompress(encoded_data, encoded_size, compressed_data, compressed_encoded_size);
-         if (ZSTD_isError(uncompressed_size_big))
-         {
-            ret = false;
-            goto exit;
-         }
-         break;
-#endif
-      default:
-         RARCH_WARN("[Replay] Unrecognized compression scheme %d\n", compression);
-         ret = false;
-         goto exit;
-   }
-   switch (encoding)
-   {
-      case REPLAY_CHECKPOINT2_ENCODING_RAW:
-         size         = encoded_size;
-         state        = encoded_data;
-         encoded_data = NULL;
-         break;
-      default:
-         RARCH_WARN("[Replay] Unrecognized encoding scheme %d\n", encoding);
-         ret = false;
-         goto exit;
-   }
-   serial_info.data_const = state;
-   serial_info.size       = size;
-   if (!core_unserialize(&serial_info))
-   {
-      ret = false;
-      goto exit;
-   }
- exit:
-   if (compressed_data)
-      free(compressed_data);
-   if (encoded_data)
-      free(encoded_data);
-   if (state)
-      free(state);
-   return ret;
-}
-
-bool bsv_movie_write_checkpoint(bsv_movie_t *handle, uint8_t compression, uint8_t encoding, retro_ctx_serialize_info_t serial_info)
-{
-   bool ret = true;
-   uint32_t encoded_size, compressed_encoded_size, size_;
-   uint8_t *encoded_data            = NULL;
-   uint8_t *compressed_encoded_data = NULL;
-   bool owns_encoded                = false;
-   bool owns_compressed_encoded     = false;
-   switch (encoding)
-   {
-      case REPLAY_CHECKPOINT2_ENCODING_RAW:
-         encoded_size = serial_info.size;
-         encoded_data = (uint8_t*)serial_info.data;
-         break;
-      default:
-         RARCH_ERR("[Replay] Unrecognized encoding scheme %d\n", encoding);
-         ret = false;
-         goto exit;
-   }
-   switch (compression)
-   {
-      case REPLAY_CHECKPOINT2_COMPRESSION_NONE:
-         compressed_encoded_size = encoded_size;
-         compressed_encoded_data = (uint8_t*)encoded_data;
-         break;
-#ifdef HAVE_ZLIB
-      case REPLAY_CHECKPOINT2_COMPRESSION_ZLIB:
-      {
-         uLongf zlib_compressed_encoded_size = compressBound(encoded_size);
-         compressed_encoded_data = (uint8_t*)calloc(zlib_compressed_encoded_size, sizeof(uint8_t));
-         owns_compressed_encoded = true;
-         if (compress2(compressed_encoded_data, &zlib_compressed_encoded_size, encoded_data, encoded_size, 6) != Z_OK)
-         {
-            ret = false;
-            goto exit;
-         }
-         compressed_encoded_size = zlib_compressed_encoded_size;
-         break;
-      }
-#endif
-#ifdef HAVE_ZSTD
-      case REPLAY_CHECKPOINT2_COMPRESSION_ZSTD:
-      {
-         size_t compressed_encoded_size_big = ZSTD_compressBound(encoded_size);
-         compressed_encoded_data = (uint8_t*)calloc(compressed_encoded_size_big, sizeof(uint8_t));
-         owns_compressed_encoded = true;
-         compressed_encoded_size_big = ZSTD_compress(compressed_encoded_data, compressed_encoded_size_big, encoded_data, encoded_size, 9);
-         if (ZSTD_isError(compressed_encoded_size_big))
-         {
-            ret = false;
-            goto exit;
-         }
-         compressed_encoded_size = compressed_encoded_size_big;
-         break;
-      }
-#endif
-      default:
-         RARCH_WARN("[Replay] Unrecognized compression scheme %d\n", compression);
-         ret = false;
-         goto exit;
-   }
-   /* uncompressed, unencoded size */
-   size_ = swap_if_big32(serial_info.size);
-   intfstream_write(handle->file, &size_, sizeof(uint32_t));
-   /* uncompressed, encoded size */
-   size_ = swap_if_big32(encoded_size);
-   intfstream_write(handle->file, &size_, sizeof(uint32_t));
-   /* compressed, encoded size */
-   size_ = swap_if_big32(compressed_encoded_size);
-   intfstream_write(handle->file, &size_, sizeof(uint32_t));
-   /* data */
-   intfstream_write(handle->file, compressed_encoded_data, compressed_encoded_size);
- exit:
-   if (encoded_data && owns_encoded)
-      free(encoded_data);
-   if (compressed_encoded_data && owns_compressed_encoded)
-      free(compressed_encoded_data);
-   return ret;
-}
-
-void bsv_movie_read_next_events(bsv_movie_t *handle)
-{
-   input_driver_state_t *input_st = input_state_get_ptr();
-   if (intfstream_read(handle->file, &(handle->key_event_count), 1) == 1)
-   {
-      int i;
-      for (i = 0; i < handle->key_event_count; i++)
-      {
-         if (intfstream_read(handle->file, &(handle->key_events[i]),
-                  sizeof(bsv_key_data_t)) != sizeof(bsv_key_data_t))
-         {
-            /* Unnatural EOF */
-            RARCH_ERR("[Replay] Keyboard replay ran out of keyboard inputs too early.\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-            return;
-         }
-      }
-   }
-   else
-   {
-      RARCH_LOG("[Replay] EOF after buttons.\n");
-      /* Natural(?) EOF */
-      input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-      return;
-   }
-   if (handle->version > 0)
-   {
-      if (intfstream_read(handle->file, &(handle->input_event_count), 2) == 2)
-      {
-         int i;
-         handle->input_event_count = swap_if_big16(handle->input_event_count);
-         for (i = 0; i < handle->input_event_count; i++)
-         {
-            if (intfstream_read(handle->file, &(handle->input_events[i]),
-                     sizeof(bsv_input_data_t)) != sizeof(bsv_input_data_t))
-            {
-               /* Unnatural EOF */
-               RARCH_ERR("[Replay] Input replay ran out of inputs too early.\n");
-               input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-               return;
-            }
-         }
-      }
-      else
-      {
-         RARCH_LOG("[Replay] EOF after inputs.\n");
-         /* Natural(?) EOF */
-         input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-         return;
-      }
-   }
-
-   {
-      uint8_t next_frame_type=REPLAY_TOKEN_INVALID;
-      if (intfstream_read(handle->file, (uint8_t *)(&next_frame_type),
-               sizeof(uint8_t)) != sizeof(uint8_t))
-      {
-         /* Unnatural EOF */
-         RARCH_ERR("[Replay] Replay ran out of frames.\n");
-         input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-         return;
-      }
-      else if (next_frame_type == REPLAY_TOKEN_CHECKPOINT_FRAME)
-      {
-         size_t _len;
-         uint8_t *state;
-         retro_ctx_serialize_info_t serial_info;
-         if (intfstream_read(handle->file, &_len, sizeof(uint64_t)) != sizeof(uint64_t))
-         {
-            /* Unnatural EOF */
-            RARCH_ERR("[Replay] Replay truncated before reading size.\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-            return;
-         }
-         _len  = swap_if_big64(_len);
-         state = (uint8_t*)calloc(_len, sizeof(uint8_t));
-         if (intfstream_read(handle->file, state, _len) != (int64_t)_len)
-         {
-            /* Unnatural EOF */
-            RARCH_ERR("[Replay] Replay checkpoint truncated.\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-            free(state);
-            return;
-         }
-         serial_info.data_const = state;
-         serial_info.size       = _len;
-         if (!core_unserialize(&serial_info))
-         {
-            RARCH_ERR("[Replay] Failed to load movie checkpoint, failing\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-         }
-         free(state);
-      }
-      else if (next_frame_type == REPLAY_TOKEN_CHECKPOINT2_FRAME)
-      {
-         uint8_t compression, encoding;
-         if (   intfstream_read(handle->file, &(compression), sizeof(uint8_t)) != sizeof(uint8_t)
-             || intfstream_read(handle->file, &(encoding), sizeof(uint8_t)) != sizeof(uint8_t))
-         {
-            /* Unexpected EOF */
-            RARCH_ERR("[Replay] Replay checkpoint truncated.\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-            return;
-         }
-         if (!bsv_movie_load_checkpoint(handle, compression, encoding))
-            RARCH_WARN("[Replay] Failed to load movie checkpoint\n");
-      }
-   }
-}
-
-void bsv_movie_next_frame(input_driver_state_t *input_st)
-{
-   unsigned checkpoint_interval   = config_get_ptr()->uints.replay_checkpoint_interval;
-   /* if bsv_movie_state_next_handle is not null, deinit and set
-      bsv_movie_state_handle to bsv_movie_state_next_handle and clear
-      next_handle */
-   bsv_movie_t         *handle    = input_st->bsv_movie_state_handle;
-   if (input_st->bsv_movie_state_next_handle)
-   {
-      if (handle)
-         bsv_movie_deinit(input_st);
-      handle = input_st->bsv_movie_state_next_handle;
-      input_st->bsv_movie_state_handle = handle;
-      input_st->bsv_movie_state_next_handle = NULL;
-   }
-
-   if (!handle)
-      return;
-#ifdef HAVE_REWIND
-   if (state_manager_frame_is_reversed())
-      return;
-#endif
-
-   if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_RECORDING)
-   {
-      int i;
-      uint16_t evt_count = swap_if_big16(handle->input_event_count);
-      /* write key events, frame is over */
-      intfstream_write(handle->file, &(handle->key_event_count), 1);
-      for (i = 0; i < handle->key_event_count; i++)
-         intfstream_write(handle->file, &(handle->key_events[i]),
-               sizeof(bsv_key_data_t));
-      /* Zero out key events when playing back or recording */
-      handle->key_event_count = 0;
-      /* write input events, frame is over */
-      intfstream_write(handle->file, &evt_count, 2);
-      for (i = 0; i < handle->input_event_count; i++)
-         intfstream_write(handle->file, &(handle->input_events[i]),
-               sizeof(bsv_input_data_t));
-      /* Zero out input events when playing back or recording */
-      handle->input_event_count = 0;
-
-      /* Maybe record checkpoint */
-      if (     (checkpoint_interval != 0)
-            && (handle->frame_counter > 0)
-            && (handle->frame_counter % (checkpoint_interval*60) == 0))
-      {
-         uint8_t frame_tok   = REPLAY_TOKEN_CHECKPOINT2_FRAME;
-         retro_ctx_serialize_info_t serial_info;
-#if defined(HAVE_ZSTD)
-         uint8_t compression = REPLAY_CHECKPOINT2_COMPRESSION_ZSTD;
-#elif defined(HAVE_ZLIB)
-         uint8_t compression = REPLAY_CHECKPOINT2_COMPRESSION_ZLIB;
-#else
-         uint8_t compression = REPLAY_CHECKPOINT2_COMPRESSION_NONE;
-#endif
-         uint8_t encoding    = REPLAY_CHECKPOINT2_ENCODING_RAW;
-         size_t _len         = core_serialize_size();
-         uint8_t *st         = (uint8_t*)malloc(_len);
-         serial_info.data    = st;
-         serial_info.size    = _len;
-         core_serialize(&serial_info);
-         /* "next frame is a checkpoint" */
-         intfstream_write(handle->file, (uint8_t *)(&frame_tok), sizeof(uint8_t));
-         /* compression and encoding schemes */
-         intfstream_write(handle->file, (uint8_t *)(&compression), sizeof(uint8_t));
-         intfstream_write(handle->file, (uint8_t *)(&encoding), sizeof(uint8_t));
-         if (!bsv_movie_write_checkpoint(handle, compression, encoding, serial_info))
-         {
-            RARCH_ERR("[Replay] failed to write checkpoint, exiting record\n");
-            input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-         }
-         free(st);
-      }
-      else
-      {
-         uint8_t frame_tok = REPLAY_TOKEN_REGULAR_FRAME;
-         /* write "next frame is not a checkpoint" */
-         intfstream_write(handle->file, (uint8_t *)(&frame_tok), sizeof(uint8_t));
-      }
-   }
-
-   if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_PLAYBACK)
-      bsv_movie_read_next_events(handle);
-   handle->frame_pos[handle->frame_counter & handle->frame_mask] = intfstream_tell(handle->file);
-}
-
-size_t replay_get_serialize_size(void)
-{
-   input_driver_state_t *input_st = &input_driver_st;
-   if (input_st->bsv_movie_state.flags & (BSV_FLAG_MOVIE_RECORDING | BSV_FLAG_MOVIE_PLAYBACK))
-      return sizeof(uint32_t)+intfstream_tell(input_st->bsv_movie_state_handle->file);
-   return 0;
-}
-
-bool replay_get_serialized_data(void* buffer)
-{
-   input_driver_state_t *input_st = &input_driver_st;
-   bsv_movie_t *handle            = input_st->bsv_movie_state_handle;
-
-   if (input_st->bsv_movie_state.flags & (BSV_FLAG_MOVIE_RECORDING | BSV_FLAG_MOVIE_PLAYBACK))
-   {
-      int32_t file_end        = (uint32_t)intfstream_tell(handle->file);
-      int64_t read_amt        = 0;
-      int32_t file_end_       = swap_if_big32(file_end);
-      uint8_t *buf;
-      ((uint32_t *)buffer)[0] = file_end_;
-      buf                     = ((uint8_t *)buffer) + sizeof(uint32_t);
-      intfstream_rewind(handle->file);
-      read_amt                = intfstream_read(handle->file, buf, file_end);
-      if (read_amt != file_end)
-         RARCH_ERR("[Replay] Failed to write correct number of replay bytes into state file: %d / %d.\n",
-               read_amt, file_end);
-   }
-   return true;
-}
-
-static bool replay_check_same_timeline(bsv_movie_t *movie,
-      uint8_t *other_movie, int64_t other_len)
-{
-   uint64_t size1, size2;
-   uint16_t btncount1, btncount2;
-   int64_t check_limit = MIN(other_len, intfstream_tell(movie->file));
-   intfstream_t *check_stream = intfstream_open_memory(other_movie, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE, other_len);
-   bool ret            = true;
-   int64_t check_cap   = MAX(128 << 10, MAX(128*sizeof(bsv_key_data_t), 512*sizeof(bsv_input_data_t)));
-   uint8_t *buf1       = (uint8_t*)calloc(check_cap,1);
-   uint8_t *buf2       = (uint8_t*)calloc(check_cap,1);
-   size_t movie_pos    = intfstream_tell(movie->file);
-   uint8_t frametok1   = 0;
-   uint8_t frametok2   = 0;
-   uint8_t keycount1   = 0;
-   uint8_t keycount2   = 0;
-
-   intfstream_rewind(movie->file);
-   intfstream_read(movie->file, buf1, 6*sizeof(uint32_t));
-   intfstream_read(check_stream, buf2, 6*sizeof(uint32_t));
-
-   if (memcmp(buf1, buf2, 6*sizeof(uint32_t)) != 0)
-   {
-      RARCH_ERR("[Replay] Headers of two movies differ, not same timeline\n");
-      ret = false;
-      goto exit;
-   }
-
-   intfstream_seek(movie->file, movie->min_file_pos, SEEK_SET);
-   /* assumption: both headers have the same state size */
-   intfstream_seek(check_stream, movie->min_file_pos, SEEK_SET);
-   if (movie->version == 0)
-   {
-      int64_t i;
-      /* no choice but to memcmp the whole stream against the other */
-      for (i = 0; ret && i < check_limit; i += check_cap)
-      {
-         int64_t read_end = MIN(check_limit - i, check_cap);
-         int64_t read1 = intfstream_read(movie->file, buf1, read_end);
-         int64_t read2 = intfstream_read(check_stream, buf2, read_end);
-         if (read1 != read_end || read2 != read_end || memcmp(buf1, buf2, read_end) != 0)
-         {
-            RARCH_ERR("[Replay] One or the other replay checkpoint has different byte values\n");
-            ret = false;
-            goto exit;
-         }
-      }
-      goto exit;
-   }
-   while (intfstream_tell(movie->file) < check_limit && intfstream_tell(check_stream) < check_limit)
-   {
-      if (intfstream_tell(movie->file) < 0 || intfstream_tell(check_stream) < 0)
-      {
-         RARCH_ERR("[Replay] One or the other replay checkpoint has ended prematurely\n");
-         ret = false;
-         goto exit;
-      }
-      if (     intfstream_read(movie->file,  &keycount1, 1) < 1
-            || intfstream_read(check_stream, &keycount2, 1) < 1
-            || keycount1 != keycount2)
-      {
-         RARCH_ERR("[Replay] Replay checkpoints disagree on key count, %d vs %d\n", keycount1, keycount2);
-         ret = false;
-         goto exit;
-      }
-      if (
-               (uint64_t)intfstream_read(movie->file, buf1, keycount1*sizeof(bsv_key_data_t))
-               < keycount1*sizeof(bsv_key_data_t)
-            || (uint64_t)intfstream_read(check_stream, buf2, keycount2*sizeof(bsv_key_data_t))
-            < keycount2*sizeof(bsv_key_data_t)
-            || memcmp(buf1, buf2, keycount1*sizeof(bsv_key_data_t)) != 0)
-      {
-         RARCH_ERR("[Replay] Replay checkpoints disagree on key data\n");
-         ret = false;
-         goto exit;
-      }
-      if (     intfstream_read(movie->file, &btncount1, 2)  < 2
-            || intfstream_read(check_stream, &btncount2, 2) < 2
-            || btncount1 != btncount2)
-      {
-         RARCH_ERR("[Replay] Replay checkpoints disagree on input count\n");
-         ret = false;
-         goto exit;
-      }
-      btncount1 = swap_if_big16(btncount1);
-      btncount2 = swap_if_big16(btncount2);
-      if (   (uint64_t)intfstream_read(movie->file, buf1, btncount1*sizeof(bsv_input_data_t))
-            < btncount1*sizeof(bsv_input_data_t)
-            || (uint64_t)intfstream_read(check_stream, buf2, btncount2*sizeof(bsv_input_data_t))
-            < btncount2*sizeof(bsv_input_data_t)
-            || memcmp(buf1, buf2, btncount1*sizeof(bsv_input_data_t)) != 0)
-      {
-         RARCH_ERR("[Replay] Replay checkpoints disagree on input data\n");
-         ret = false;
-         goto exit;
-      }
-      if (     intfstream_read(movie->file,  &frametok1, 1) < 1
-            || intfstream_read(check_stream, &frametok2, 1) < 1
-            || frametok1 != frametok2)
-      {
-         RARCH_ERR("[Replay] Replay checkpoints disagree on frame token\n");
-         ret = false;
-         goto exit;
-      }
-      switch (frametok1)
-      {
-         case REPLAY_TOKEN_INVALID:
-            RARCH_ERR("[Replay] Both replays are somehow invalid\n");
-            ret = false;
-            goto exit;
-         case REPLAY_TOKEN_REGULAR_FRAME:
-            break;
-         case REPLAY_TOKEN_CHECKPOINT_FRAME:
-            if (     (uint64_t)intfstream_read(movie->file, &size1, sizeof(uint64_t)) < sizeof(uint64_t)
-                  || (uint64_t)intfstream_read(check_stream, &size2, sizeof(uint64_t)) < sizeof(uint64_t)
-                  || size1 != size2)
-            {
-               RARCH_ERR("[Replay] Replay checkpoints disagree on size or scheme\n");
-               ret = false;
-               goto exit;
-            }
-            size1 = swap_if_big64(size1);
-            intfstream_seek(movie->file, size1, SEEK_CUR);
-            intfstream_seek(check_stream, size1, SEEK_CUR);
-            break;
-         case REPLAY_TOKEN_CHECKPOINT2_FRAME:
-         {
-            uint32_t cpsize1, cpsize2;
-            /* read cp2 header:
-               - one byte compression codec, one byte encoding scheme
-               - 4 byte uncompressed unencoded size, 4 byte uncompressed encoded size
-               - 4 byte compressed, encoded size
-               - the data will follow
-            */
-            if (intfstream_read(movie->file, buf1, 2+sizeof(uint32_t)*3) != 2+sizeof(uint32_t)*3 ||
-                  intfstream_read(check_stream, buf2, 2+sizeof(uint32_t)*3) != 2+sizeof(uint32_t)*3 ||
-                  memcmp(buf1, buf2, 2+sizeof(uint32_t)*3) != 0
-                )
-            {
-               ret = false;
-               goto exit;
-            }
-            memcpy(&cpsize1, buf1+10, sizeof(uint32_t));
-            memcpy(&cpsize2, buf2+10, sizeof(uint32_t));
-            cpsize1 = swap_if_big32(cpsize1);
-            cpsize2 = swap_if_big32(cpsize2);
-            intfstream_seek(movie->file, cpsize1, SEEK_CUR);
-            intfstream_seek(check_stream, cpsize2, SEEK_CUR);
-            break;
-         }
-         default:
-            RARCH_ERR("[Replay] Unrecognized frame token in both replays\n");
-            ret = false;
-            goto exit;
-      }
-   }
- exit:
-   free(buf1);
-   free(buf2);
-   intfstream_close(check_stream);
-   intfstream_seek(movie->file, movie_pos, SEEK_SET);
-   return ret;
-}
-
-bool replay_set_serialized_data(void* buf)
-{
-   uint8_t *buffer                = (uint8_t*)buf;
-   input_driver_state_t *input_st = &input_driver_st;
-   bool playback                  = (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_PLAYBACK)  ? true : false;
-   bool recording                 = (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_RECORDING) ? true : false;
-   bsv_movie_t *movie             = input_st->bsv_movie_state_handle;
-   /* If there is no current replay, ignore this entirely.
-      TODO/FIXME: Later, consider loading up the replay
-      and allow the user to continue it?
-      Or would that be better done from the replay hotkeys?
-    */
-   if (!(playback || recording))
-      return true;
-
-   if (!buffer)
-   {
-      if (recording)
-      {
-         const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_FAILED_INCOMPAT);
-         runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
-         RARCH_ERR("[Replay] %s.\n", _msg);
-         return false;
-      }
-
-      if (playback)
-      {
-         const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT);
-         runloop_msg_queue_push(_msg, sizeof(_msg), 1, 180, true, NULL,
-               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_WARNING);
-         RARCH_WARN("[Replay] %s.\n", _msg);
-         movie_stop(input_st);
-      }
-   }
-   else
-   {
-      /* TODO: should factor the next few lines away, magic numbers ahoy */
-      uint32_t *header         = (uint32_t *)(buffer + sizeof(uint32_t));
-      int64_t *ident_spot      = (int64_t *)(header + 4);
-      int64_t ident;
-      /* avoid unaligned 8-byte read */
-      memcpy(&ident, ident_spot, sizeof(int64_t));
-      ident = swap_if_big64(ident);
-
-      if (ident == movie->identifier) /* is compatible? */
-      {
-         int64_t _len       = (int64_t)swap_if_big32(((uint32_t *)buffer)[0]);
-         int64_t handle_idx = intfstream_tell(movie->file);
-         bool same_timeline = replay_check_same_timeline(movie, (uint8_t *)header, _len);
-         /* If the state is part of this replay, go back to that state
-            and rewind/fast forward the replay.
-
-            If the savestate movie is after the current replay
-            length we can replace the current replay data with it,
-            but if it's earlier we can rewind the replay to the
-            savestate movie time point.
-
-            This can truncate the current replay if we're in recording mode.
-         */
-         if (playback && _len > handle_idx)
-         {
-            const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_FAILED_FUTURE_STATE);
-            runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-                  MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
-            RARCH_ERR("[Replay] %s.\n", _msg);
-            return false;
-         }
-         else if (playback && !same_timeline)
-         {
-            const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_FAILED_WRONG_TIMELINE);
-            runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-                  MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
-            RARCH_ERR("[Replay] %s.\n", _msg);
-            return false;
-         }
-         else if (recording && (_len > handle_idx || !same_timeline))
-         {
-            if (!same_timeline)
-            {
-               const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_OVERWRITING_REPLAY);
-               runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-                     MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_WARNING);
-               RARCH_WARN("[Replay] %s.\n", _msg);
-            }
-            intfstream_rewind(movie->file);
-            intfstream_write(movie->file, buffer+sizeof(int32_t), _len);
-         }
-         else
-         {
-            intfstream_seek(movie->file, _len, SEEK_SET);
-            if (recording)
-               intfstream_truncate(movie->file, _len);
-         }
-      }
-      else
-      {
-         /* otherwise, if recording do not allow the load */
-         if (recording)
-         {
-            const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_FAILED_INCOMPAT);
-            runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-                  MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
-            RARCH_ERR("[Replay] %s.\n", _msg);
-            return false;
-         }
-         /* if in playback, halt playback and go to that state normally */
-         if (playback)
-         {
-            const char *_msg = msg_hash_to_str(MSG_REPLAY_LOAD_STATE_HALT_INCOMPAT);
-            runloop_msg_queue_push(_msg, strlen(_msg), 1, 180, true, NULL,
-                  MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_WARNING);
-            RARCH_WARN("[Replay] %s.\n", _msg);
-            movie_stop(input_st);
-         }
-      }
-   }
-   return true;
-}
-#endif
-
 void input_driver_poll(void)
 {
    size_t i, j;
@@ -6875,40 +6180,6 @@ void input_driver_poll(void)
    if (     input_st->current_driver
          && input_st->current_driver->poll)
       input_st->current_driver->poll(input_st->current_data);
-
-   input_st->turbo_btns.count++;
-
-   if (input_st->flags & INP_FLAG_BLOCK_LIBRETRO_INPUT)
-   {
-      for (i = 0; i < max_users; i++)
-         input_st->turbo_btns.frame_enable[i] = 0;
-      return;
-   }
-
-   /* This rarch_joypad_info_t struct contains the device index + autoconfig binds for the
-    * controller to be queried, and also (for unknown reasons) the analog axis threshold
-    * when mapping analog stick to dpad input. */
-   for (i = 0; i < max_users; i++)
-   {
-      uint16_t button_id = RARCH_TURBO_ENABLE;
-
-      if (settings->ints.input_turbo_bind != -1)
-         button_id = settings->ints.input_turbo_bind;
-
-      joypad_info[i].axis_threshold        = input_axis_threshold;
-      joypad_info[i].joy_idx               = settings->uints.input_joypad_index[i];
-      joypad_info[i].auto_binds            = input_autoconf_binds[joypad_info[i].joy_idx];
-
-      input_st->turbo_btns.frame_enable[i] =
-               (*input_st->libretro_input_binds[i])[button_id].valid
-            && settings->bools.input_turbo_enable ?
-         input_state_wrap(input_st->current_driver, input_st->current_data,
-               joypad, sec_joypad, &joypad_info[i],
-               (*input_st->libretro_input_binds),
-               (input_st->flags & INP_FLAG_KB_MAPPING_BLOCKED) ? true : false,
-               (unsigned)i,
-               RETRO_DEVICE_JOYPAD, 0, button_id) : 0;
-   }
 
 #ifdef HAVE_OVERLAY
    if (      input_st->overlay_ptr
@@ -6949,6 +6220,74 @@ void input_driver_poll(void)
             settings->floats.input_axis_threshold);
    }
 #endif
+
+   input_st->turbo_btns.count++;
+
+   if (input_st->flags & INP_FLAG_BLOCK_LIBRETRO_INPUT)
+   {
+      for (i = 0; i < max_users; i++)
+      {
+         input_st->turbo_btns.frame_enable[i] = 0;
+         input_st->hold_btns.frame_enable[i]  = 0;
+      }
+      return;
+   }
+
+   /* This rarch_joypad_info_t struct contains the device index + autoconfig binds for the
+    * controller to be queried, and also (for unknown reasons) the analog axis threshold
+    * when mapping analog stick to dpad input. */
+   for (i = 0; i < max_users; i++)
+   {
+      uint16_t button_id = RARCH_TURBO_ENABLE;
+      bool turbo_enable  = settings->bools.input_turbo_enable;
+
+      if (settings->ints.input_turbo_bind != -1)
+         button_id = settings->ints.input_turbo_bind;
+
+      joypad_info[i].axis_threshold        = input_axis_threshold;
+      joypad_info[i].joy_idx               = settings->uints.input_joypad_index[i];
+      joypad_info[i].auto_binds            = input_autoconf_binds[joypad_info[i].joy_idx];
+
+      input_st->turbo_btns.frame_enable[i] =
+               (*input_st->libretro_input_binds[i])[button_id].valid
+            && turbo_enable ?
+         input_state_wrap(input_st->current_driver, input_st->current_data,
+               joypad, sec_joypad, &joypad_info[i],
+               (*input_st->libretro_input_binds),
+               (input_st->flags & INP_FLAG_KB_MAPPING_BLOCKED) ? true : false,
+               (unsigned)i,
+               RETRO_DEVICE_JOYPAD, 0, button_id) : 0;
+
+#ifdef HAVE_OVERLAY
+      if (     (i == 0)
+            && turbo_enable
+            && input_st->overlay_ptr
+            && (input_st->overlay_ptr->flags & INPUT_OVERLAY_ALIVE)
+            && BIT256_GET(input_st->overlay_ptr->overlay_state.buttons, button_id))
+         input_st->turbo_btns.frame_enable[i] = true;
+#endif
+   }
+
+   /* Poll hold button modifier state */
+   for (i = 0; i < max_users; i++)
+   {
+      input_st->hold_btns.frame_enable[i] =
+               (*input_st->libretro_input_binds[i])[RARCH_HOLD_ENABLE].valid ?
+         input_state_wrap(input_st->current_driver, input_st->current_data,
+               joypad, sec_joypad, &joypad_info[i],
+               (*input_st->libretro_input_binds),
+               (input_st->flags & INP_FLAG_KB_MAPPING_BLOCKED) ? true : false,
+               (unsigned)i,
+               RETRO_DEVICE_JOYPAD, 0, RARCH_HOLD_ENABLE) : 0;
+
+#ifdef HAVE_OVERLAY
+      if (     (i == 0)
+            && input_st->overlay_ptr
+            && (input_st->overlay_ptr->flags & INPUT_OVERLAY_ALIVE)
+            && BIT256_GET(input_st->overlay_ptr->overlay_state.buttons, RARCH_HOLD_ENABLE))
+         input_st->hold_btns.frame_enable[i] = true;
+#endif
+   }
 
 #ifdef HAVE_MENU
    if (!(menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE))
@@ -7301,29 +6640,7 @@ void input_driver_poll(void)
 #endif
 #ifdef HAVE_BSV_MOVIE
    if (BSV_MOVIE_IS_PLAYBACK_ON())
-   {
-      runloop_state_t *runloop_st   = runloop_state_get_ptr();
-      retro_keyboard_event_t *key_event                 = &runloop_st->key_event;
-
-      if (*key_event && *key_event == runloop_st->frontend_key_event)
-      {
-         int i;
-         bsv_key_data_t k;
-         for (i = 0; i < input_st->bsv_movie_state_handle->key_event_count; i++)
-         {
-#ifdef HAVE_CHEEVOS
-            rcheevos_pause_hardcore();
-#endif
-            k = input_st->bsv_movie_state_handle->key_events[i];
-            input_keyboard_event(k.down, swap_if_big32(k.code),
-                  swap_if_big32(k.character), swap_if_big16(k.mod),
-                  RETRO_DEVICE_KEYBOARD);
-         }
-         /* Have to clear here so we don't double-apply key events */
-         /* Zero out key events when playing back or recording */
-         input_st->bsv_movie_state_handle->key_event_count = 0;
-      }
-   }
+      bsv_movie_poll(input_st);
 #endif
 }
 
@@ -7335,22 +6652,8 @@ int16_t input_driver_state_wrapper(unsigned port, unsigned device,
    settings_t *settings        = config_get_ptr();
    int16_t result              = 0;
 #ifdef HAVE_BSV_MOVIE
-   /* Load input from BSV record, if enabled */
    if (BSV_MOVIE_IS_PLAYBACK_ON())
-   {
-      int16_t bsv_result = 0;
-      bsv_movie_t *movie = input_st->bsv_movie_state_handle;
-      if (bsv_movie_handle_read_input_event(
-          movie, port, device, idx, id, &bsv_result))
-      {
-#ifdef HAVE_CHEEVOS
-         rcheevos_pause_hardcore();
-#endif
-         return bsv_result;
-      }
-
-      input_st->bsv_movie_state.flags |= BSV_FLAG_MOVIE_END;
-   }
+     return bsv_movie_read_state(input_st, port, device, idx, id);
 #endif
 
    /* Read input state */
@@ -7364,12 +6667,11 @@ int16_t input_driver_state_wrapper(unsigned port, unsigned device,
       input_st->analog_requested[port] = true;
 
 #ifdef HAVE_BSV_MOVIE
-   /* Save input to BSV record, if enabled */
    if (BSV_MOVIE_IS_RECORDING())
 #ifdef HAVE_REWIND
-   if (!state_manager_frame_is_reversed())
+      if (!state_manager_frame_is_reversed())
 #endif
-      bsv_movie_handle_push_input_event(
+      bsv_movie_push_input_event(
             input_st->bsv_movie_state_handle,
             port,
             device,
@@ -7644,6 +6946,7 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
    unsigned block_delay                = settings->uints.input_hotkey_block_delay;
    uint8_t max_users                   = settings->uints.input_max_users;
    uint8_t port                        = 0;
+   uint8_t hotkey_port                 = 0;
 #ifdef HAVE_MENU
    bool all_users_control_menu         = settings->bools.input_all_users_control_menu;
    bool display_kb                     = menu_input_dialog_get_display_kb();
@@ -7658,10 +6961,11 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
    for (port = 0; port < (int)max_users; port++)
    {
       const struct retro_keybind *binds_norm = &input_config_binds[port][RARCH_ENABLE_HOTKEY];
-      const struct retro_keybind *binds_auto = &input_autoconf_binds[port][RARCH_ENABLE_HOTKEY];
+      const struct retro_keybind *binds_auto = NULL;
 
       joypad_info.joy_idx                    = settings->uints.input_joypad_index[port];
       joypad_info.auto_binds                 = input_autoconf_binds[joypad_info.joy_idx];
+      binds_auto                             = &input_autoconf_binds[joypad_info.joy_idx][RARCH_ENABLE_HOTKEY];
 
 #ifdef HAVE_MENU
       if (menu_is_alive)
@@ -7746,7 +7050,19 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
       }
 #endif /* HAVE_MENU */
 
-      input_keys_pressed(port,
+      if (settings->bools.input_hotkey_follows_player1)
+      {
+         /* Hotkeys are bound to player 1 (the first user mapped to core port 0),
+          * even if player 1 is remapped to a different user. */
+         hotkey_port = settings->uints.input_remap_port_map[0][0];
+
+         if (hotkey_port >= MAX_USERS)
+            hotkey_port = 0;
+      }
+
+      input_keys_pressed(
+            port,
+            hotkey_port,
 #ifdef HAVE_MENU
             menu_is_alive,
 #else
@@ -8184,12 +7500,11 @@ void input_keyboard_event(bool down, unsigned code,
          if (*key_event == runloop_st->frontend_key_event)
          {
 #ifdef HAVE_BSV_MOVIE
-            /* Save input to BSV record, if recording */
             if (BSV_MOVIE_IS_RECORDING())
 #ifdef HAVE_REWIND
                if (!state_manager_frame_is_reversed())
 #endif
-               bsv_movie_handle_push_key_event(
+               bsv_movie_push_key_event(
                      input_st->bsv_movie_state_handle, down, mod,
                      code, character);
 #endif

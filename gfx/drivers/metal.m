@@ -916,7 +916,7 @@ font_renderer_t metal_raster_font = {
    _viewport->full_height  = height;
    video_driver_set_size(_viewport->full_width, _viewport->full_height);
    _layer.drawableSize     = CGSizeMake(width, height);
-   video_driver_update_viewport(_viewport, forceFull, _keepAspect);
+   video_driver_update_viewport(_viewport, forceFull, _keepAspect, YES);
    _context.viewport       = _viewport; /* Update matrix */
    _viewportMVP.outputSize = simd_make_float2(_viewport->full_width, _viewport->full_height);
 }
@@ -1033,7 +1033,7 @@ font_renderer_t metal_raster_font = {
 - (void)_beginFrame
 {
    video_viewport_t vp = *_viewport;
-   video_driver_update_viewport(_viewport, NO, _keepAspect);
+   video_driver_update_viewport(_viewport, NO, _keepAspect, YES);
 
    if (memcmp(&vp, _viewport, sizeof(vp)) != 0)
       _context.viewport = _viewport;
@@ -2531,6 +2531,43 @@ static uint32_t metal_get_flags(void *data)
    return flags;
 }
 
+static void metal_get_video_output_size(void *data,
+      unsigned *width, unsigned *height, char *desc, size_t desc_len)
+{
+#if TARGET_OS_IPHONE
+   /* iOS/tvOS: Return physical screen resolution, not window size */
+   UIScreen *screen = [UIScreen mainScreen];
+   CGRect nativeBounds = screen.nativeBounds;
+   *width  = (unsigned)nativeBounds.size.width;
+   *height = (unsigned)nativeBounds.size.height;
+
+   if (desc && desc_len > 0)
+   {
+      float scale = cocoa_screen_get_native_scale();
+      if (scale >= 3.0f)
+         strlcpy(desc, "Super Retina", desc_len);
+      else if (scale >= 2.0f)
+         strlcpy(desc, "Retina", desc_len);
+      else
+         strlcpy(desc, "Standard", desc_len);
+   }
+#else
+   /* macOS: Return display resolution */
+   CGDirectDisplayID display = CGMainDisplayID();
+   *width  = (unsigned)CGDisplayPixelsWide(display);
+   *height = (unsigned)CGDisplayPixelsHigh(display);
+
+   if (desc && desc_len > 0)
+   {
+      float scale = cocoa_screen_get_backing_scale_factor();
+      if (scale >= 2.0f)
+         strlcpy(desc, "Retina", desc_len);
+      else
+         strlcpy(desc, "Standard", desc_len);
+   }
+#endif
+}
+
 static const video_poke_interface_t metal_poke_interface = {
    metal_get_flags,
    metal_load_texture,
@@ -2538,7 +2575,7 @@ static const video_poke_interface_t metal_poke_interface = {
    metal_set_video_mode,
    metal_get_refresh_rate,
    metal_set_filtering,
-   NULL, /* get_video_output_size */
+   metal_get_video_output_size,
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */
    NULL, /* get_current_framebuffer */

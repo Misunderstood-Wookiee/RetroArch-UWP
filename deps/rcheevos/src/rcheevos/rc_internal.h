@@ -14,10 +14,11 @@ typedef struct rc_scratch_string {
 rc_scratch_string_t;
 
 typedef struct rc_modified_memref_t {
-  rc_memref_t memref;              /* for compatibility with rc_operand_t.value.memref */
+  rc_memref_t memref;              /* For compatibility with rc_operand_t.value.memref */
   rc_operand_t parent;             /* The parent memref this memref is derived from (type will always be a memref type) */
   rc_operand_t modifier;           /* The modifier to apply to the parent. */
   uint8_t modifier_type;           /* How to apply the modifier to the parent. (RC_OPERATOR_*) */
+  uint16_t depth;                  /* The number of parents this memref has. */
 }
 rc_modified_memref_t;
 
@@ -311,6 +312,7 @@ rc_condset_t* rc_parse_condset(const char** memaddr, rc_parse_state_t* parse);
 int rc_test_condset(rc_condset_t* self, rc_eval_state_t* eval_state);
 void rc_reset_condset(rc_condset_t* self);
 rc_condition_t* rc_condset_get_conditions(rc_condset_t* self);
+void rc_test_condset_internal(rc_condition_t* condition, uint32_t num_conditions, rc_eval_state_t* eval_state, int can_short_circuit);
 
 enum {
   RC_PROCESSING_COMPARE_DEFAULT = 0,
@@ -379,8 +381,8 @@ int rc_lboard_state_active(int state);
 void rc_parse_richpresence_internal(rc_richpresence_t* self, const char* script, rc_parse_state_t* parse);
 rc_memrefs_t* rc_richpresence_get_memrefs(rc_richpresence_t* self);
 void rc_reset_richpresence_triggers(rc_richpresence_t* self);
+void rc_update_richpresence_internal(rc_richpresence_t* richpresence, rc_peek_t peek, void* peek_ud);
 
-int rc_validate_memrefs(const rc_memrefs_t* memrefs, char result[], const size_t result_size, uint32_t max_address);
 int rc_validate_memrefs_for_console(const rc_memrefs_t* memrefs, char result[], const size_t result_size, uint32_t console_id);
 
 RC_END_C_DECLS

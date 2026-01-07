@@ -34,6 +34,7 @@
 #define RARCH_FIRST_META_KEY           RARCH_CUSTOM_BIND_LIST_END
 
 #define RARCH_UNMAPPED                 1024
+#define RARCH_NO_BIND                  "---"
 
 /* Specialized _MOUSE that targets the full screen regardless of viewport.
  */
@@ -117,6 +118,8 @@ enum
 
    /* Turbo */
    RARCH_TURBO_ENABLE = RARCH_FIRST_MISC_CUSTOM_BIND,
+   /* Hold */
+   RARCH_HOLD_ENABLE,
 
    RARCH_CUSTOM_BIND_LIST_END,
 
@@ -147,6 +150,9 @@ enum
    RARCH_PLAY_REPLAY_KEY,
    RARCH_RECORD_REPLAY_KEY,
    RARCH_HALT_REPLAY_KEY,
+   RARCH_SAVE_REPLAY_CHECKPOINT_KEY,
+   RARCH_PREV_REPLAY_CHECKPOINT_KEY,
+   RARCH_NEXT_REPLAY_CHECKPOINT_KEY,
    RARCH_REPLAY_SLOT_PLUS,
    RARCH_REPLAY_SLOT_MINUS,
 

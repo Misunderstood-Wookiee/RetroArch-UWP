@@ -45,6 +45,7 @@
 
 #if defined(WEBOS)
 #include <sys/resource.h>
+#include "input/common/wayland_common_webos.h"
 #endif
 
 #include <stdio.h>
@@ -1682,6 +1683,11 @@ void drivers_init(
             location_st->active = false;
    }
 
+#ifdef HAVE_MENU
+   if (flags & DRIVER_INPUT_MASK)
+      menu_st->input_pointer_hw_state.flags |= MENU_INP_PTR_FLG_RESET;
+#endif
+
    core_info_init_current_core();
 
 #if defined(HAVE_GFX_WIDGETS)
@@ -1765,6 +1771,10 @@ void drivers_init(
 
 #ifdef HAVE_LAKKA
    cpu_scaling_driver_init();
+#endif
+
+#ifdef HAVE_MENU
+   srand(time(NULL));
 #endif
 }
 
@@ -1921,6 +1931,7 @@ static void retroarch_deinit_drivers(struct retro_callbacks *cbs)
                          | INP_FLAG_NONBLOCKING);
 
       memset(&input_st->turbo_btns, 0, sizeof(turbo_buttons_t));
+      memset(&input_st->hold_btns, 0, sizeof(hold_buttons_t));
       memset(&input_st->analog_requested, 0,
          sizeof(input_st->analog_requested));
       input_st->current_driver           = NULL;
@@ -2018,7 +2029,7 @@ global_t *global_get_ptr(void)
    return &global_driver_st;
 }
 
-uint16_t retroarch_get_flags(void)
+uint32_t retroarch_get_flags(void)
 {
    struct rarch_state *p_rarch = &rarch_st;
    return p_rarch->flags;
@@ -3548,6 +3559,21 @@ bool command_event(enum event_command cmd, void *data)
             configuration_set_int(settings, settings->ints.state_slot, new_state_slot);
          }
          break;
+      case CMD_EVENT_SAVE_REPLAY_CHECKPOINT:
+#ifdef HAVE_BSV_MOVIE
+         movie_commit_checkpoint(input_state_get_ptr());
+#endif
+         break;
+      case CMD_EVENT_PREV_REPLAY_CHECKPOINT:
+#ifdef HAVE_BSV_MOVIE
+         movie_skip_to_prev_checkpoint(input_state_get_ptr());
+#endif
+         break;
+      case CMD_EVENT_NEXT_REPLAY_CHECKPOINT:
+#ifdef HAVE_BSV_MOVIE
+         movie_skip_to_next_checkpoint(input_state_get_ptr());
+#endif
+         break;
       case CMD_EVENT_REPLAY_DECREMENT:
 #ifdef HAVE_BSV_MOVIE
          {
@@ -3643,9 +3669,7 @@ bool command_event(enum event_command cmd, void *data)
                }
             }
 #endif
-#ifdef HAVE_CLOUDSYNC
-            task_push_cloud_sync();
-#endif
+
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
             runloop_st->runtime_shader_preset_path[0] = '\0';
 #endif
@@ -3695,6 +3719,11 @@ bool command_event(enum event_command cmd, void *data)
                runloop_st->subsystem_current_count = 0;
                content_clear_subsystem();
             }
+#ifdef HAVE_CLOUDSYNC
+            /* Sync on core unload if in automatic mode */
+            if (settings->uints.cloud_sync_sync_mode == CLOUD_SYNC_MODE_AUTOMATIC)
+               task_push_cloud_sync();
+#endif
          }
 
 #ifdef HAVE_MENU
@@ -3961,6 +3990,8 @@ bool command_event(enum event_command cmd, void *data)
             if (!ol)
                return false;
 
+            input_overlay_next_move_touch_masks(ol);
+
             ol->index                      = ol->next_index;
             ol->active                     = &ol->overlays[ol->index];
 
@@ -3971,9 +4002,11 @@ bool command_event(enum event_command cmd, void *data)
             input_overlay_load_active(input_st->overlay_visibility,
                   ol, input_overlay_opacity);
 
-            ol->flags                     |= INPUT_OVERLAY_BLOCKED;
             ol->next_index                 =
                   (unsigned)((ol->index + 1) % ol->size);
+
+            /* Trigger viewport recalculation - overlay may have viewport override */
+            command_event(CMD_EVENT_VIDEO_SET_ASPECT_RATIO, NULL);
 
             /* Check orientation, if required */
             if (inp_overlay_auto_rotate)
@@ -4231,6 +4264,16 @@ bool command_event(enum event_command cmd, void *data)
             rcheevos_unload();
 #endif
             runloop_event_deinit_core();
+
+            /* Clear turbo and hold button state on core unload */
+            {
+               input_driver_state_t *input_st = input_state_get_ptr();
+               if (input_st)
+               {
+                  memset(&input_st->turbo_btns, 0, sizeof(turbo_buttons_t));
+                  memset(&input_st->hold_btns, 0, sizeof(hold_buttons_t));
+               }
+            }
 
 #ifdef HAVE_RUNAHEAD
             /* If 'runahead_available' is false, then
@@ -4607,6 +4650,17 @@ bool command_event(enum event_command cmd, void *data)
          command_event(CMD_EVENT_QUIT, NULL);
 #endif
          break;
+#ifdef HAVE_CLOUDSYNC
+      case CMD_EVENT_CLOUD_SYNC:
+         task_push_cloud_sync();
+         break;
+      case CMD_EVENT_CLOUD_SYNC_RESOLVE_KEEP_LOCAL:
+         task_push_cloud_sync_resolve_keep_local();
+         break;
+      case CMD_EVENT_CLOUD_SYNC_RESOLVE_KEEP_SERVER:
+         task_push_cloud_sync_resolve_keep_server();
+         break;
+#endif
       case CMD_EVENT_MENU_RESET_TO_DEFAULT_CONFIG:
          config_set_defaults(global_get_ptr());
          break;
@@ -5940,6 +5994,11 @@ int rarch_main(int argc, char *argv[], void *data)
       setenv("EGL_PLATFORM", "wayland", 0);
    if (getenv("XDG_RUNTIME_DIR") == NULL)
       setenv("XDG_RUNTIME_DIR", "/tmp/xdg", 0);
+   /* wayland */
+   if (getenv("XKB_CONFIG_ROOT") == NULL)
+      setenv("XKB_CONFIG_ROOT", "/usr/share/X11/xkb", 0);
+   if (getenv("WAYLAND_DISPLAY") == NULL)
+      setenv("WAYLAND_DISPLAY", "wayland-0", 0);
 
    struct rlimit limit = {0, 0};
    setrlimit(RLIMIT_CORE, &limit);
@@ -6016,8 +6075,9 @@ int rarch_main(int argc, char *argv[], void *data)
 #endif
          settings->bools.ui_companion_start_on_boot
          );
-#if HAVE_CLOUDSYNC
-   task_push_cloud_sync();
+#ifdef HAVE_CLOUDSYNC
+   if (settings->uints.cloud_sync_sync_mode == CLOUD_SYNC_MODE_AUTOMATIC)
+      task_push_cloud_sync();
 #endif
 #if !defined(HAVE_MAIN) || defined(HAVE_QT)
    for (;;)
@@ -6056,6 +6116,8 @@ int rarch_main(int argc, char *argv[], void *data)
 
 #if defined(EMSCRIPTEN)
 
+bool platform_emscripten_finish_deferred_sleep(void);
+
 #ifdef EMSCRIPTEN_AUDIO_EXTERNAL_BLOCK
 #ifdef HAVE_AUDIOWORKLET
 bool audioworklet_external_block(void);
@@ -6084,11 +6146,12 @@ void emscripten_mainloop(void)
    bool runloop_is_paused                 = (runloop_flags & RUNLOOP_FLAG_PAUSED)     ? true : false;
 
    /* Prevents the program from running in any of the following conditions:
-    * 1. requestAnimationFrame is being used and the window is not visible.
-    * Firefox likes to call requestAnimationFrame at 1 FPS when the window isn't focused,
-    * we want to avoid this.
+    * 1. The window is not visible.
     * 2. The GL context is lost and hasn't been recovered yet. */
    if (platform_emscripten_should_drop_iter())
+      return;
+
+   if (platform_emscripten_finish_deferred_sleep())
       return;
 
 #ifdef HAVE_RWEBAUDIO
@@ -6122,6 +6185,9 @@ void emscripten_mainloop(void)
          if (video_st->current_video_context.swap_buffers)
             video_st->current_video_context.swap_buffers(
                   video_st->context_data);
+#ifdef PROXY_TO_PTHREAD
+         platform_emscripten_wait_for_frame();
+#endif
          return;
       }
    }
@@ -6139,17 +6205,18 @@ void emscripten_mainloop(void)
 
    task_queue_check();
 
+   if (ret == -1)
+   {
+      main_exit(NULL);
+      emscripten_force_exit(0);
+      return;
+   }
+
 #ifdef PROXY_TO_PTHREAD
-   /* sync with requestAnimationFrame on browser thread if vsync is on */
-   /* performance seems better with this wait at the end of the iter */
+   /* Sync with requestAnimationFrame on browser thread if vsync is on. */
+   /* Performance seems better with this wait at the end of the iter. */
    platform_emscripten_wait_for_frame();
 #endif
-
-   if (ret != -1)
-      return;
-
-   main_exit(NULL);
-   emscripten_force_exit(0);
 }
 #endif
 
@@ -7810,11 +7877,30 @@ bool retroarch_main_init(int argc, char *argv[])
    if (verbosity_enabled)
    {
       {
-         char str_output[256];
+         char str_output[384];
          const char *cpu_model  = frontend_driver_get_cpu_model_name();
          size_t _len = strlcpy(str_output,
                "=== Build =======================================\n",
                sizeof(str_output));
+
+#ifdef WEBOS
+         {
+            char osbuf[128];
+            int major = 0, minor = 0;
+            frontend_state_t *frontend_st = frontend_state_get_ptr();
+            if (frontend_st)
+            {
+               frontend_ctx_driver_t *frontend = frontend_st->current_frontend_ctx;
+               if (frontend && frontend->get_os)
+               {
+                  frontend->get_os(osbuf, sizeof(osbuf), &major, &minor);
+                  _len += snprintf(str_output + _len, sizeof(str_output) - _len,
+                        FILE_PATH_LOG_INFO " Running on: %s\n",
+                        osbuf);
+               }
+            }
+         }
+#endif
 
          if (!string_is_empty(cpu_model))
          {
@@ -7997,18 +8083,19 @@ bool retroarch_main_init(int argc, char *argv[])
          else
             input_remapping_restore_global_config(true, false);
 
-#ifdef HAVE_CONFIGFILE
-         /* Reload the original config */
-         if (runloop_st->flags & RUNLOOP_FLAG_OVERRIDES_ACTIVE)
-            config_unload_override();
-#endif
-
 #ifdef HAVE_DYNAMIC
          /* Ensure that currently loaded core is properly
           * deinitialised */
          if (runloop_st->current_core_type != CORE_TYPE_DUMMY)
             command_event(CMD_EVENT_CORE_DEINIT, NULL);
 #endif
+
+#ifdef HAVE_CONFIGFILE
+         /* Reload the original config */
+         if (runloop_st->flags & RUNLOOP_FLAG_OVERRIDES_ACTIVE)
+            config_unload_override();
+#endif
+
          /* Attempt initializing dummy core */
          runloop_st->current_core_type = CORE_TYPE_DUMMY;
          if (!command_event(CMD_EVENT_CORE_INIT, &runloop_st->current_core_type))
@@ -8596,6 +8683,12 @@ bool retroarch_main_quit(void)
        * save state file may be truncated) */
       content_wait_for_save_state_task();
 
+      runloop_runtime_log_deinit(runloop_st,
+            settings->bools.content_runtime_log,
+            settings->bools.content_runtime_log_aggregate,
+            settings->paths.directory_runtime_log,
+            settings->paths.directory_playlist);
+
       if (     (runloop_st->flags & RUNLOOP_FLAG_REMAPS_CORE_ACTIVE)
             || (runloop_st->flags & RUNLOOP_FLAG_REMAPS_CONTENT_DIR_ACTIVE)
             || (runloop_st->flags & RUNLOOP_FLAG_REMAPS_GAME_ACTIVE)
@@ -8609,11 +8702,9 @@ bool retroarch_main_quit(void)
          input_remapping_restore_global_config(true, false);
 
 #ifdef HAVE_CONFIGFILE
+      /* Reload the original config */
       if (runloop_st->flags & RUNLOOP_FLAG_OVERRIDES_ACTIVE)
-      {
-         /* Reload the original config */
          config_unload_override();
-      }
 #endif
 
 #ifdef HAVE_MENU
@@ -8651,6 +8742,10 @@ bool retroarch_main_quit(void)
 
 #ifdef HAVE_GAME_AI
    game_ai_shutdown();
+#endif
+
+#if defined(WEBOS) && defined(HAVE_WAYLAND)
+   shutdown_webos_contexts();
 #endif
 
    return true;

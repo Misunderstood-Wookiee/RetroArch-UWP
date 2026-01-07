@@ -19,6 +19,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "input/input_driver.h"
 #ifdef _WIN32
 #ifdef _XBOX
 #include <xtl.h>
@@ -86,7 +87,7 @@
 #include <lists/dir_list.h>
 
 #ifdef EMSCRIPTEN
-#include <emscripten/emscripten.h>
+#include "frontend/drivers/platform_emscripten.h"
 #endif
 
 #ifdef HAVE_LIBNX
@@ -245,9 +246,6 @@
 #define SHADER_FILE_WATCH_DELAY_MSEC 500
 
 #define QUIT_DELAY_USEC 3 * 1000000 /* 3 seconds */
-
-#define DEFAULT_NETWORK_GAMEPAD_PORT 55400
-#define UDP_FRAME_PACKETS 16
 
 #ifdef HAVE_ZLIB
 #define DEFAULT_EXT "zip"
@@ -662,7 +660,6 @@ static void runloop_update_runtime_log(
    free(runtime_log);
 }
 
-
 void runloop_runtime_log_deinit(
       runloop_state_t *runloop_st,
       bool content_runtime_log,
@@ -670,7 +667,8 @@ void runloop_runtime_log_deinit(
       const char *dir_runtime_log,
       const char *dir_playlist)
 {
-   if (verbosity_is_enabled())
+   if (     verbosity_is_enabled()
+         && runloop_st->core_runtime_usec > 0)
    {
       char log[256]             = {0};
       unsigned hours            = 0;
@@ -683,7 +681,7 @@ void runloop_runtime_log_deinit(
 
       /* TODO/FIXME - localize */
       snprintf(log, sizeof(log),
-            "[Core] Content ran for a total of:"
+            "[Runtime] Content ran for a total of:"
             " %02u hours, %02u minutes, %02u seconds.",
             hours, minutes, seconds);
       RARCH_LOG("%s\n", log);
@@ -3331,6 +3329,15 @@ bool runloop_environment_cb(unsigned cmd, void *data)
          *(unsigned *)data = 2;
          break;
 
+      case RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE:
+      {
+         if (!settings)
+            return false;
+
+         *(unsigned *)data = settings->uints.audio_output_sample_rate;
+         break;
+      }
+
       case RETRO_ENVIRONMENT_GET_TARGET_REFRESH_RATE:
       {
          /* Try to use the polled refresh rate first.  */
@@ -4117,11 +4124,9 @@ void runloop_event_deinit_core(void)
    driver_uninit(DRIVERS_CMD_ALL, (enum driver_lifetime_flags)0);
 
 #ifdef HAVE_CONFIGFILE
+   /* Reload the original config */
    if (runloop_st->flags & RUNLOOP_FLAG_OVERRIDES_ACTIVE)
-   {
-      /* Reload the original config */
       config_unload_override();
-   }
 #endif
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
    runloop_st->runtime_shader_preset_path[0] = '\0';
@@ -4278,7 +4283,18 @@ static bool event_init_content(
    runloop_path_fill_names();
 
    if (!content_init())
+   {
+#ifdef HAVE_MENU
+      /* Single-click playlist return */
+      if (settings->bools.input_menu_singleclick_playlists)
+         menu_state_get_ptr()->flags |= MENU_ST_FLAG_PENDING_CLOSE_CONTENT;
+
+      /* Return from empty Quick Menu if core is manually loaded and needs reloading */
+      if (!path_is_empty(RARCH_PATH_CORE_LAST))
+         menu_state_get_ptr()->flags |= MENU_ST_FLAG_PENDING_CLOSE_CONTENT;
+#endif
       return false;
+   }
 
    command_event_set_savestate_auto_index(settings);
    command_event_set_replay_auto_index(settings);
@@ -5005,7 +5021,7 @@ bool core_options_create_override(bool game_specific)
    RARCH_LOG("[Core] Core options file created: \"%s\".\n", options_path);
    _msg = msg_hash_to_str(MSG_CORE_OPTIONS_FILE_CREATED_SUCCESSFULLY);
    runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
-         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_SUCCESS);
 
    path_set(RARCH_PATH_CORE_OPTIONS, options_path);
    if (game_specific)
@@ -5180,7 +5196,7 @@ bool core_options_remove_override(bool game_specific)
    {
       const char *_msg = msg_hash_to_str(MSG_CORE_OPTIONS_FILE_REMOVED_SUCCESSFULLY);
       runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
-            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_SUCCESS);
    }
 
    if (conf)
@@ -5279,11 +5295,13 @@ void core_options_flush(void)
 {
    size_t _len;
    char msg[128];
+   enum message_queue_category category
+                                   = MESSAGE_QUEUE_CATEGORY_INFO;
    runloop_state_t *runloop_st     = &runloop_state;
    core_option_manager_t *coreopts = runloop_st->core_options;
    const char *path_core_options   = path_get(RARCH_PATH_CORE_OPTIONS);
    const char *core_options_file   = NULL;
-   bool success                    = false;
+   bool ret                        = false;
 
    msg[0] = '\0';
 
@@ -5311,7 +5329,7 @@ void core_options_flush(void)
       {
          core_option_manager_flush(runloop_st->core_options, conf_tmp);
 
-         success = config_file_write(conf_tmp, path_core_options, true);
+         ret = config_file_write(conf_tmp, path_core_options, true);
          config_file_free(conf_tmp);
       }
    }
@@ -5335,7 +5353,7 @@ void core_options_flush(void)
          if (!path_is_valid(path_core_options))
             runloop_st->core_options->conf->flags |= CONF_FILE_FLG_MODIFIED;
 
-         success = config_file_write(runloop_st->core_options->conf,
+         ret = config_file_write(runloop_st->core_options->conf,
                path_core_options, true);
       }
    }
@@ -5347,9 +5365,8 @@ void core_options_flush(void)
    if (string_is_empty(core_options_file))
       core_options_file = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_UNKNOWN);
 
-   if (success)
+   if (ret)
    {
-      /* Log result */
       _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_OPTIONS_FLUSHED),
             sizeof(msg));
       RARCH_LOG(
@@ -5358,19 +5375,19 @@ void core_options_flush(void)
    }
    else
    {
-      /* Log result */
       _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_OPTIONS_FLUSH_FAILED),
             sizeof(msg));
-      RARCH_LOG(
+      RARCH_ERR(
             "[Core] Failed to save core options to \"%s\".\n",
             path_core_options ? path_core_options : "UNKNOWN");
+      category = MESSAGE_QUEUE_CATEGORY_ERROR;
    }
 
    _len += snprintf(msg + _len, sizeof(msg) - _len, " \"%s\"",
          core_options_file);
 
    runloop_msg_queue_push(msg, _len, 1, 100, true, NULL,
-         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         MESSAGE_QUEUE_ICON_DEFAULT, category);
 }
 
 void runloop_msg_queue_push(
@@ -6141,6 +6158,7 @@ static enum runloop_state_enum runloop_check_state(
          menu_st->selection_ptr  = 0;
          menu_st->flags         &= ~MENU_ST_FLAG_PENDING_QUICK_MENU;
          menu_st->flags         &= ~MENU_ST_FLAG_PENDING_STARTUP_PAGE;
+         return RUNLOOP_STATE_POLLED_AND_SLEEP;
       }
       /* Navigate to initial startup page */
       else if (menu_st->flags & MENU_ST_FLAG_PENDING_STARTUP_PAGE)
@@ -6885,9 +6903,9 @@ static enum runloop_state_enum runloop_check_state(
       {
          check = true;
          state_slot--;
-         /* Wrap to 0 */
+         /* Wrap to Auto */
          if (state_slot < 0)
-            state_slot = 0;
+            state_slot = -1;
       }
 
       if (check)
@@ -6910,10 +6928,17 @@ static enum runloop_state_enum runloop_check_state(
 
             if (state_slot > 0)
                _len += snprintf(path + _len, sizeof(path) - _len, "%d", state_slot);
+            else if (state_slot < 0)
+               _len  = fill_pathname_join_delim(path,
+                     runloop_st->name.savestate, "auto", '.', sizeof(path));
 
             strlcpy(path + _len, FILE_PATH_PNG_EXTENSION, sizeof(path) - _len);
 
-            snprintf(msg, sizeof(msg), "%d", state_slot);
+            if (state_slot < 0)
+               snprintf(msg, sizeof(msg), "%s", "Auto");
+            else
+               snprintf(msg, sizeof(msg), "%d", state_slot);
+
             gfx_widget_state_slot_show(dispwidget_get_ptr(), msg, path);
          }
          else
@@ -7001,6 +7026,9 @@ static enum runloop_state_enum runloop_check_state(
    HOTKEY_CHECK(RARCH_PLAY_REPLAY_KEY, CMD_EVENT_PLAY_REPLAY, true, NULL);
    HOTKEY_CHECK(RARCH_RECORD_REPLAY_KEY, CMD_EVENT_RECORD_REPLAY, true, NULL);
    HOTKEY_CHECK(RARCH_HALT_REPLAY_KEY, CMD_EVENT_HALT_REPLAY, true, NULL);
+   HOTKEY_CHECK(RARCH_SAVE_REPLAY_CHECKPOINT_KEY, CMD_EVENT_SAVE_REPLAY_CHECKPOINT, true, NULL);
+   HOTKEY_CHECK(RARCH_PREV_REPLAY_CHECKPOINT_KEY, CMD_EVENT_PREV_REPLAY_CHECKPOINT, true, NULL);
+   HOTKEY_CHECK(RARCH_NEXT_REPLAY_CHECKPOINT_KEY, CMD_EVENT_NEXT_REPLAY_CHECKPOINT, true, NULL);
 
    /* Check Disc Control hotkeys */
    HOTKEY_CHECK3(
@@ -7181,6 +7209,10 @@ int runloop_iterate(void)
    }
 #endif
 
+#ifdef HAVE_BSV_MOVIE
+   bsv_movie_dequeue_next(input_st);
+#endif
+
    if (runloop_st->frame_time.callback)
    {
       /* Updates frame timing if frame timing callback is in use by the core.
@@ -7266,15 +7298,30 @@ int runloop_iterate(void)
          /* FIXME: This is an ugly way to tell Netplay this... */
          netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
 #endif
+#if defined(EMSCRIPTEN) && !defined(EMSCRIPTEN_ASYNCIFY) && !defined(PROXY_TO_PTHREAD)
+         platform_emscripten_deferred_sleep(10);
+#else
 #if defined(HAVE_COCOATOUCH)
          if (!(uico_st->flags & UICO_ST_FLAG_IS_ON_FOREGROUND))
 #endif
             retro_sleep(10);
+#endif
          return 1;
       case RUNLOOP_STATE_PAUSE:
 #ifdef HAVE_NETWORKING
          /* FIXME: This is an ugly way to tell Netplay this... */
          netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
+#endif
+#ifdef HAVE_BSV_MOVIE
+         if (input_st->bsv_movie_state.flags &
+               (BSV_FLAG_MOVIE_FORCE_CHECKPOINT |
+                     BSV_FLAG_MOVIE_PREV_CHECKPOINT |
+                     BSV_FLAG_MOVIE_NEXT_CHECKPOINT |
+                     BSV_FLAG_MOVIE_SEEK_TO_FRAME))
+         {
+            runloop_st->flags &= ~RUNLOOP_FLAG_PAUSED;
+            runloop_st->run_frames_and_pause = 2;
+         }
 #endif
          video_driver_cached_frame();
          goto end;
@@ -7320,10 +7367,6 @@ int runloop_iterate(void)
 #ifdef HAVE_THREADS
    if (runloop_st->flags & RUNLOOP_FLAG_AUTOSAVE)
       autosave_lock();
-#endif
-
-#ifdef HAVE_BSV_MOVIE
-   bsv_movie_next_frame(input_st);
 #endif
 
    if (     settings->bools.camera_allow
@@ -7381,12 +7424,7 @@ int runloop_iterate(void)
    presence_update(PRESENCE_GAME);
 #endif
 #ifdef HAVE_BSV_MOVIE
-   bsv_movie_finish_rewind(input_st);
-   if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_END)
-   {
-      movie_stop_playback(input_st);
-      command_event(CMD_EVENT_PAUSE, NULL);
-   }
+   bsv_movie_next_frame(input_st);
    if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_END)
    {
       movie_stop_playback(input_st);
@@ -7466,10 +7504,14 @@ end:
 
          if (sleep_ms > 0)
          {
+#if defined(EMSCRIPTEN) && !defined(EMSCRIPTEN_ASYNCIFY) && !defined(PROXY_TO_PTHREAD)
+            platform_emscripten_deferred_sleep(sleep_ms);
+#else
 #if defined(HAVE_COCOATOUCH)
             if (!(uico_state_get_ptr()->flags & UICO_ST_FLAG_IS_ON_FOREGROUND))
 #endif
                retro_sleep(sleep_ms);
+#endif
          }
 
          return 1;

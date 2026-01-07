@@ -52,6 +52,10 @@
 #include "streams/chd_stream.h"
 #endif
 
+#ifdef HAVE_CHEEVOS_RVZ
+#include "cheevos_rvz.h"
+#endif
+
 #include "cheevos.h"
 #include "cheevos_client.h"
 #include "cheevos_menu.h"
@@ -1340,13 +1344,28 @@ static void rcheevos_client_login_callback(int result,
 
    if (result != RC_OK)
    {
+      settings_t* settings = config_get_ptr();
       char msg[256];
       size_t _len = strlcpy(msg, "RetroAchievements login failed: ",
             sizeof(msg));
       _len += strlcpy(msg + _len, error_message, sizeof(msg) - _len);
       CHEEVOS_LOG(RCHEEVOS_TAG "%s\n", msg);
+
+      if (result == RC_EXPIRED_TOKEN || /* token expired */
+          (result == RC_INVALID_CREDENTIALS && settings->arrays.cheevos_token[0])) /* token invalid */
+      {
+         /* expired token, clear it out */
+         settings->arrays.cheevos_token[0] = '\0';
+
+         /* the server message says to log in again. RetroArch doesn't really
+            have a login form, so use a custom message (that's translated) to
+            tell them to re-enter their password and restart the game. */
+         _len = strlcpy(msg, msg_hash_to_str(MSG_CHEEVOS_LOGIN_TOKEN_EXPIRED),
+               sizeof(msg));
+      }
+
       runloop_msg_queue_push(msg, _len, 0, 2 * 60, false, NULL,
-         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
       return;
    }
 
@@ -1444,18 +1463,29 @@ static void rcheevos_client_load_game_callback(int result,
             return;
 
          _len = strlcpy(msg, msg_hash_to_str(MSG_CHEEVOS_GAME_NOT_IDENTIFIED), sizeof(msg));
+
+         runloop_msg_queue_push(msg, _len, 0, 2 * 60, false, NULL,
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
       }
       else
       {
          if (!error_message)
             error_message = "Unknown error";
 
-         _len = snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_CHEEVOS_GAME_LOAD_FAILED), error_message);
          CHEEVOS_LOG(RCHEEVOS_TAG "Game load failed: %s\n", error_message);
+
+         if (result == RC_LOGIN_REQUIRED)
+         {
+            /* assume error already reported by rcheevos_client_login_callback */
+         }
+         else
+         {
+            _len = snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_CHEEVOS_GAME_LOAD_FAILED), error_message);
+            runloop_msg_queue_push(msg, _len, 0, 2 * 60, false, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+         }
       }
 
-      runloop_msg_queue_push(msg, _len, 0, 2 * 60, false, NULL,
-         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
       return;
    }
 
@@ -1610,8 +1640,33 @@ bool rcheevos_load(const void *data)
       gfx_widget_set_cheevos_set_loading(true);
 #endif
 
-   rc_client_begin_identify_and_load_game(rcheevos_locals.client, RC_CONSOLE_UNKNOWN,
-      info->path, (const uint8_t*)info->data, info->size, rcheevos_client_load_game_callback, NULL);
+   /* Detect RVZ files and determine console type (GameCube or Wii) */
+   {
+      uint32_t console_id = RC_CONSOLE_UNKNOWN;
+
+#ifdef HAVE_CHEEVOS_RVZ
+      if (string_is_equal_noncase(path_get_extension(info->path), "rvz"))
+      {
+         console_id = rcheevos_rvz_get_console_id(info->path);
+
+         /* Only register custom file reader for valid RVZ files */
+         if (console_id != RC_CONSOLE_UNKNOWN)
+         {
+            struct rc_hash_filereader filereader;
+
+            filereader.open  = rcheevos_rvz_open;
+            filereader.seek  = rcheevos_rvz_seek;
+            filereader.tell  = rcheevos_rvz_tell;
+            filereader.read  = rcheevos_rvz_read;
+            filereader.close = rcheevos_rvz_close;
+            rc_hash_init_custom_filereader(&filereader);
+         }
+      }
+#endif
+
+      rc_client_begin_identify_and_load_game(rcheevos_locals.client, console_id,
+         info->path, (const uint8_t*)info->data, info->size, rcheevos_client_load_game_callback, NULL);
+   }
 
    return true;
 }

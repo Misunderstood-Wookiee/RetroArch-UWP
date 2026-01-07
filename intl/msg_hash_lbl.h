@@ -403,6 +403,10 @@ MSG_HASH(
    "replay_checkpoint_interval"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_REPLAY_CHECKPOINT_DESERIALIZE,
+   "replay_checkpoint_deserialize"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_AUTO_OVERRIDES_ENABLE,
    "auto_overrides_enable"
    )
@@ -935,12 +939,8 @@ MSG_HASH(
    "deferred_frame_time_counter_settings_list"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_REMOVE_LIST,
-   "deferred_video_shader_preset_remove_list"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_SAVE_LIST,
-   "deferred_video_shader_preset_save_list"
+   MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_MANAGER_LIST,
+   "deferred_video_shader_preset_manager_list"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_CDROM_INFO_LIST,
@@ -1194,7 +1194,7 @@ MSG_HASH(
 #endif
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_CORE_UPDATER_LIST,
-   "core_updater"
+   "deferred_core_updater_list"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_LIST,
@@ -1835,6 +1835,10 @@ MSG_HASH(
    "all_users_control_menu"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_MENU_SINGLECLICK_PLAYLISTS,
+   "menu_singleclick_playlists"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_MENU_ALLOW_TABS_BACK,
    "menu_allow_tabs_back"
    )
@@ -1885,6 +1889,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_INPUT_ANALOG_SENSITIVITY,
    "input_analog_sensitivity"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_INPUT_SENSOR_ACCELEROMETER_SENSITIVITY,
+   "input_sensor_accelerometer_sensitivity"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_INPUT_SENSOR_GYROSCOPE_SENSITIVITY,
+   "input_sensor_gyroscope_sensitivity"
    )
 #ifdef GEKKO
 MSG_HASH(
@@ -2129,6 +2141,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_INPUT_OVERLAY_MOUSE_SWIPE_THRESHOLD,
    "input_overlay_mouse_swipe_threshold"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_INPUT_OVERLAY_MOUSE_ALT_TWO_TOUCH_INPUT,
+   "input_overlay_mouse_alt_two_touch_input"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_INPUT_OVERLAY_DPAD_DIAGONAL_SENSITIVITY,
@@ -3007,6 +3023,18 @@ MSG_HASH(
    "quit_retroarch"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_SYNC_NOW,
+   "cloud_sync_sync_now"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_RESOLVE_KEEP_LOCAL,
+   "cloud_sync_resolve_keep_local"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_RESOLVE_KEEP_SERVER,
+   "cloud_sync_resolve_keep_server"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_RDB_ENTRY,
    "rdb_entry"
    )
@@ -3675,6 +3703,18 @@ MSG_HASH(
    "cloud_sync_enable"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_SYNC_MODE,
+   "cloud_sync_sync_mode"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_SYNC_MODE_AUTOMATIC,
+   "cloud_sync_sync_mode_automatic"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CLOUD_SYNC_SYNC_MODE_MANUAL,
+   "cloud_sync_sync_mode_manual"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_CLOUD_SYNC_DESTRUCTIVE,
    "cloud_sync_destructive"
    )
@@ -3757,26 +3797,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_SETTINGS_TAB,
    "settings_tab"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_SHADER_APPLY_CHANGES,
-   "shader_apply_changes"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_SHADER_WATCH_FOR_CHANGES,
-   "video_shader_watch_files"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VIDEO_SHADER_REMEMBER_LAST_DIR,
-   "video_shader_remember_last_dir"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_SHADER_OPTIONS,
-   "shader_options"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_SHADER_PARAMETERS_ENTRY,
-   "shader_parameters_entry"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_SHOW_ADVANCED_SETTINGS,
@@ -4591,6 +4611,26 @@ MSG_HASH(
    "video_shader_dir"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_SHADER_WATCH_FOR_CHANGES,
+   "video_shader_watch_files"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_SHADER_REMEMBER_LAST_DIR,
+   "video_shader_remember_last_dir"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_SHADER_APPLY_CHANGES,
+   "shader_apply_changes"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_SHADER_OPTIONS,
+   "shader_options"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_SHADER_PARAMETERS_ENTRY,
+   "shader_parameters_entry"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_SHADER_FILTER_PASS,
    "video_shader_filter_pass"
    )
@@ -4623,8 +4663,8 @@ MSG_HASH(
    "video_shader_preset_parameters"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_REMOVE,
-   "video_shader_preset_remove"
+   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_MANAGER,
+   "video_shader_preset_manager"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_REMOVE_GLOBAL,
@@ -4643,12 +4683,12 @@ MSG_HASH(
    "video_shader_preset_remove_game"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE,
-   "video_shader_preset_save"
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_REFERENCE,
    "video_shader_preset_save_reference"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_CURRENT,
+   "video_shader_preset_save_current"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_AS,

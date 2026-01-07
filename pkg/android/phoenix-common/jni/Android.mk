@@ -10,6 +10,7 @@ HAVE_VULKAN := 1
 HAVE_CHEEVOS := 1
 HAVE_FILE_LOGGER := 1
 HAVE_GFX_WIDGETS := 1
+HAVE_SAF := 1
 
 INCFLAGS    :=
 DEFINES     :=
@@ -91,9 +92,12 @@ DEFINES += -DRARCH_MOBILE \
 	   -DHAVE_SCREENSHOTS \
 	   -DHAVE_REWIND \
 	   -DHAVE_CHEATS \
-	   -DHAVE_RGUI \
+	   -DHAVE_BSV_MOVIE \
 	   -DHAVE_ZLIB \
 	   -DHAVE_NO_BUILTINZLIB \
+	   -DHAVE_ZSTD \
+	   -DZSTD_DISABLE_ASM \
+	   -DHAVE_CHEEVOS_RVZ \
 	   -DHAVE_RPNG \
 	   -DHAVE_RJPEG \
 	   -DHAVE_RBMP \
@@ -110,6 +114,7 @@ DEFINES += -DRARCH_MOBILE \
 	   -DHAVE_NETPLAYDISCOVERY \
 	   -DRARCH_INTERNAL \
 	   -DHAVE_FILTERS_BUILTIN \
+	   -DHAVE_RGUI \
 	   -DHAVE_MATERIALUI \
 	   -DHAVE_XMB \
 	   -DHAVE_OZONE \
@@ -162,6 +167,10 @@ DEFINES += -DHAVE_CHEEVOS \
 	   -DRC_DISABLE_LUA
 endif
 
+ifeq ($(HAVE_SAF),1)
+   DEFINES += -DHAVE_SAF
+endif
+
 DEFINES += -DFLAC_PACKAGE_VERSION="\"retroarch\"" \
 	   -DHAVE_LROUND \
 	   -DFLAC__HAS_OGG=0
@@ -177,11 +186,13 @@ LOCAL_C_INCLUDES := \
 		    $(LOCAL_PATH)/$(RARCH_DIR)/libretro-common/include \
 		    $(LOCAL_PATH)/$(RARCH_DIR)/deps \
 		    $(LOCAL_PATH)/$(RARCH_DIR)/deps/stb \
-		    $(LOCAL_PATH)/$(RARCH_DIR)/deps/7zip
+		    $(LOCAL_PATH)/$(RARCH_DIR)/deps/7zip \
+		    $(LOCAL_PATH)/$(RARCH_DIR)/deps/zstd/lib
 
 INCLUDE_DIRS     := \
 		    -I$(LOCAL_PATH)/$(DEPS_DIR)/stb/ \
 		    -I$(LOCAL_PATH)/$(DEPS_DIR)/7zip/ \
+		    -I$(LOCAL_PATH)/$(DEPS_DIR)/zstd/lib/ \
 		    -I$(LOCAL_PATH)/$(DEPS_DIR)/libFLAC/include
 
 ifeq ($(HAVE_CHEEVOS),1)

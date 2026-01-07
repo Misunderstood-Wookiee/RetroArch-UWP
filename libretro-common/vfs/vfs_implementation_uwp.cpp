@@ -20,15 +20,12 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include <retro_environment.h>
-
 #include <ppl.h>
 #include <ppltasks.h>
 #include <stdio.h>
 #include <wrl.h>
 #include <wrl/implements.h>
 #include <robuffer.h>
-#include <collection.h>
 #include <functional>
 #include <fileapifromapp.h>
 #include <AclAPI.h>
@@ -50,7 +47,6 @@
 #include <file/file_path.h>
 #include <string/stdstring.h>
 #include <retro_environment.h>
-#include <uwp/uwp_async.h>
 #include <uwp/std_filesystem_compat.h>
 
 namespace
@@ -72,25 +68,6 @@ namespace
       }
    }
 }
-
-#ifdef VFS_FRONTEND
-struct retro_vfs_file_handle
-#else
-struct libretro_vfs_implementation_file
-#endif
-{
-    int64_t size;
-    uint64_t mappos;
-    uint64_t mapsize;
-    FILE* fp;
-    HANDLE fh;
-    char* buf;
-    char* orig_path;
-    uint8_t* mapped;
-    int fd;
-    unsigned hints;
-    enum vfs_scheme scheme;
-};
 
 #define RFILE_HINT_UNBUFFERED (1 << 8)
 
@@ -214,7 +191,7 @@ int retro_vfs_file_flush_impl(libretro_vfs_implementation_file* stream)
 
 int retro_vfs_file_remove_impl(const char *path)
 {
-   BOOL result;
+   BOOL ret;
    wchar_t *path_wide;
 
    if (!path || !*path)
@@ -224,9 +201,9 @@ int retro_vfs_file_remove_impl(const char *path)
    windowsize_path(path_wide);
 
    /* Try Win32 first, this should work in AppData */
-   result = DeleteFileFromAppW(path_wide);
+   ret = DeleteFileFromAppW(path_wide);
    free(path_wide);
-   if (result)
+   if (ret)
       return 0;
 
    return -1;
@@ -345,7 +322,7 @@ libretro_vfs_implementation_file* retro_vfs_file_open_impl(
        goto error;
 
     stream->fh      = file_handle;
-    if ((stream->fd = _open_osfhandle((uint64)stream->fh, flags)) == -1)
+    if ((stream->fd = _open_osfhandle((uintptr_t)stream->fh, flags)) == -1)
         goto error;
 
     {
@@ -390,7 +367,7 @@ error:
     return NULL;
 }
 
-static int uwp_mkdir_impl(std::experimental::filesystem::path dir)
+static int uwp_mkdir_impl(std::filesystem::path dir)
 {
     /*I feel like this should create the directory recursively but the existing implementation does not so this update won't
      *I put in the work but I just commented out the stuff you would need */
@@ -480,13 +457,13 @@ static int uwp_move_path(
                 /* Check if source path is a dir */
                 if (lpFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                   int result;
+                   int ret;
                    /* create the target dir */
                    CreateDirectoryFromAppW(new_path.wstring().c_str(), NULL);
                    /* Call move function again but with first run disabled in
                     * order to move the folder */
-                   if ((result = uwp_move_path(old_path, new_path, false)) != 0)
-                      return result;
+                   if ((ret = uwp_move_path(old_path, new_path, false)) != 0)
+                      return ret;
                 }
                 else
                 {

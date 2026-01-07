@@ -31,6 +31,7 @@
 
 #include "../../configuration.h"
 #include "../../file_path_special.h"
+#include "../../tasks/task_content.h"
 #include "../../core.h"
 #include "../../core_info.h"
 #include "../../core_option_manager.h"
@@ -104,53 +105,35 @@ static int action_start_override_file_info(
    struct menu_state *menu_st      = menu_state_get_ptr();
    rarch_system_info_t *sys_info   = &runloop_state_get_ptr()->system;
    config_load_override(sys_info);
+
    /* Refresh menu */
    menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
                                    |  MENU_ST_FLAG_PREVENT_POPULATE;
    return 0;
 }
 
-static int action_start_shader_preset(
+static int action_start_shader_preset_file_info(
       const char *path, const char *label,
       unsigned type, size_t idx, size_t entry_idx)
 {
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-   struct menu_state *menu_st      = menu_state_get_ptr();
-   struct video_shader *shader     = menu_shader_get();
-   shader->passes                  = 0;
-   menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
-                                   |  MENU_ST_FLAG_PREVENT_POPULATE;
-   command_event(CMD_EVENT_SHADERS_APPLY_CHANGES, NULL);
+   const char *current = video_shader_get_current_shader_preset();
+   command_set_shader(NULL, current);
 #endif
    return 0;
 }
 
-static int action_start_shader_preset_prepend(
-   const char* path, const char* label,
-   unsigned type, size_t idx, size_t entry_idx)
+static int action_start_shader_parameters(
+      const char *path, const char *label,
+      unsigned type, size_t idx, size_t entry_idx)
 {
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-   struct menu_state *menu_st      = menu_state_get_ptr();
-   struct video_shader* shader     = menu_shader_get();
-   shader->passes                  = 0;
-   menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
-                                   |  MENU_ST_FLAG_PREVENT_POPULATE;
-   command_event(CMD_EVENT_SHADERS_APPLY_CHANGES, NULL);
-#endif
-   return 0;
-}
-
-static int action_start_shader_preset_append(
-   const char* path, const char* label,
-   unsigned type, size_t idx, size_t entry_idx)
-{
-#if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-   struct menu_state *menu_st      = menu_state_get_ptr();
-   struct video_shader* shader     = menu_shader_get();
-   shader->passes                  = 0;
-   menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
-                                   |  MENU_ST_FLAG_PREVENT_POPULATE;
-   command_event(CMD_EVENT_SHADERS_APPLY_CHANGES, NULL);
+   generic_action_ok_displaylist_push(
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PARAMETERS),
+         NULL,
+         msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PARAMETERS),
+         MENU_SETTING_ACTION,
+         idx, 0, ACTION_OK_DL_GENERIC);
 #endif
    return 0;
 }
@@ -642,6 +625,26 @@ static int action_start_load_core(
    return ret;
 }
 
+static int action_start_restart_content(
+      const char *path, const char *label,
+      unsigned type, size_t idx, size_t entry_idx)
+{
+   const char *core_path      = path_get(RARCH_PATH_CORE);
+   const char *content_path   = path_get(RARCH_PATH_CONTENT);
+   content_ctx_info_t content_info;
+
+   content_info.argc          = 0;
+   content_info.argv          = NULL;
+   content_info.args          = NULL;
+   content_info.environ_get   = NULL;
+
+   return task_push_load_content_with_new_core_from_menu(
+         core_path, content_path,
+         &content_info,
+         CORE_TYPE_PLAIN,
+         NULL, NULL);
+}
+
 #ifdef HAVE_BLUETOOTH
 static int action_start_bluetooth(const char *path, const char *label,
          unsigned menu_type, size_t idx, size_t entry_idx)
@@ -802,14 +805,19 @@ static int menu_cbs_init_bind_start_compare_label(menu_file_list_cbs_t *cbs)
          case MENU_ENUM_LABEL_CORE_LIST_UNLOAD:
             BIND_ACTION_START(cbs, action_start_load_core);
             break;
+         case MENU_ENUM_LABEL_RESTART_CONTENT:
+            BIND_ACTION_START(cbs, action_start_restart_content);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_MANAGER:
          case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
-            BIND_ACTION_START(cbs, action_start_shader_preset);
-            break;
-         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND:
-            BIND_ACTION_START(cbs, action_start_shader_preset_append);
-            break;
          case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PREPEND:
-            BIND_ACTION_START(cbs, action_start_shader_preset_prepend);
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND:
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PARAMETERS:
+         case MENU_ENUM_LABEL_SHADER_APPLY_CHANGES:
+            BIND_ACTION_START(cbs, action_start_shader_parameters);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_FILE_INFO:
+            BIND_ACTION_START(cbs, action_start_shader_preset_file_info);
             break;
          case MENU_ENUM_LABEL_REMAP_FILE_INFO:
             BIND_ACTION_START(cbs, action_start_remap_file_info);

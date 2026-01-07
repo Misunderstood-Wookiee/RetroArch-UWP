@@ -511,10 +511,8 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
          return MENU_ENUM_LABEL_DEFERRED_IMAGES_LIST;
       case ACTION_OK_DL_CDROM_INFO_DETAIL_LIST:
          return MENU_ENUM_LABEL_DEFERRED_CDROM_INFO_LIST;
-      case ACTION_OK_DL_SHADER_PRESET_SAVE:
-         return MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_SAVE_LIST;
-      case ACTION_OK_DL_SHADER_PRESET_REMOVE:
-         return MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_REMOVE_LIST;
+      case ACTION_OK_DL_SHADER_PRESET_MANAGER_LIST:
+         return MENU_ENUM_LABEL_DEFERRED_VIDEO_SHADER_PRESET_MANAGER_LIST;
       case ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST:
          return MENU_ENUM_LABEL_DEFERRED_MANUAL_CONTENT_SCAN_LIST;
       case ACTION_OK_DL_CORE_MANAGER_LIST:
@@ -1848,8 +1846,7 @@ int generic_action_ok_displaylist_push(
 #ifdef HAVE_LAKKA
       case ACTION_OK_DL_EJECT_DISC:
 #endif
-      case ACTION_OK_DL_SHADER_PRESET_REMOVE:
-      case ACTION_OK_DL_SHADER_PRESET_SAVE:
+      case ACTION_OK_DL_SHADER_PRESET_MANAGER_LIST:
       case ACTION_OK_DL_CDROM_INFO_LIST:
       case ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST:
       case ACTION_OK_DL_CORE_MANAGER_LIST:
@@ -1951,8 +1948,8 @@ static bool menu_content_find_first_core(
             &supported);
 
 #ifdef HAVE_DYNAMIC
-   /* Don't suggest cores if a core is already loaded. */
-   if (     !path_is_empty(RARCH_PATH_CORE)
+   /* Don't suggest cores if a core is manually loaded. */
+   if (     !path_is_empty(RARCH_PATH_CORE_LAST)
          && !config_get_ptr()->bools.core_suggest_always)
       load_content_with_current_core = true;
 #endif
@@ -2894,11 +2891,16 @@ static int action_ok_playlist_entry_collection(const char *path,
          core_path, content_path, string_is_empty(content_label) ? NULL : content_label);
 
 error:
-   runloop_msg_queue_push(
-         "File could not be loaded from playlist.\n",
-         STRLEN_CONST("File could not be loaded from playlist.\n"),
-         1, 100, true,
-         NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+   {
+      const char *_msg = msg_hash_to_str(MSG_FAILED_TO_LOAD_FROM_PLAYLIST);
+      RARCH_ERR("[Content] %s\n", _msg);
+      runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
+            MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+   }
+
+   /* Single-click playlist return */
+   if (settings->bools.input_menu_singleclick_playlists)
+      menu_state_get_ptr()->flags |= MENU_ST_FLAG_PENDING_CLOSE_CONTENT;
 
    if (playlist_initialized && tmp_playlist)
    {
@@ -3302,15 +3304,26 @@ static void menu_input_st_string_cb_disable_kiosk_mode(void *userdata,
 {
    if (str && *str)
    {
-      const char                    *label = menu_input_dialog_get_buffer();
-      settings_t                 *settings = config_get_ptr();
-      const char *path_kiosk_mode_password =
-         settings->paths.kiosk_mode_password;
+      const char *label    = menu_input_dialog_get_buffer();
+      settings_t *settings = config_get_ptr();
+      const char *password = settings->paths.kiosk_mode_password;
 
-      if (string_is_equal(label, path_kiosk_mode_password))
+      if (string_is_equal(label, password))
       {
          const char *_msg = msg_hash_to_str(MSG_INPUT_KIOSK_MODE_PASSWORD_OK);
+
          settings->bools.kiosk_mode_enable = false;
+
+         /* Refresh menu tabs list and current page */
+         {
+            struct menu_state *menu_st  = menu_state_get_ptr();
+            menu_st->selection_ptr      = 0;
+            menu_st->flags             |= MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
+
+            if (menu_st->driver_ctx->environ_cb)
+               menu_st->driver_ctx->environ_cb(MENU_ENVIRON_RESET_HORIZONTAL_LIST,
+                     NULL, menu_st->userdata);
+         }
 
          runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
                MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_SUCCESS);
@@ -3331,15 +3344,26 @@ static void menu_input_st_string_cb_enable_settings(void *userdata,
 {
    if (str && *str)
    {
-      const char                                 *label    =
-         menu_input_dialog_get_buffer();
-      settings_t                                 *settings = config_get_ptr();
-      const char *menu_content_show_settings_password      = settings->paths.menu_content_show_settings_password;
+      const char *label    = menu_input_dialog_get_buffer();
+      settings_t *settings = config_get_ptr();
+      const char *password = settings->paths.menu_content_show_settings_password;
 
-      if (string_is_equal(label, menu_content_show_settings_password))
+      if (string_is_equal(label, password))
       {
          const char *_msg = msg_hash_to_str(MSG_INPUT_ENABLE_SETTINGS_PASSWORD_OK);
+
          settings->bools.menu_content_show_settings = true;
+
+         /* Refresh menu tabs list and current page */
+         {
+            struct menu_state *menu_st  = menu_state_get_ptr();
+            menu_st->selection_ptr      = 0;
+            menu_st->flags             |= MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
+
+            if (menu_st->driver_ctx->environ_cb)
+               menu_st->driver_ctx->environ_cb(MENU_ENVIRON_RESET_HORIZONTAL_LIST,
+                     NULL, menu_st->userdata);
+         }
 
          runloop_msg_queue_push(_msg, strlen(_msg), 1, 100, true, NULL,
                MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_SUCCESS);
@@ -3428,7 +3452,8 @@ DEFAULT_ACTION_DIALOG_START(action_ok_shader_preset_save_as,
 
 enum
 {
-   ACTION_OK_SHADER_PRESET_SAVE_GLOBAL = 0,
+   ACTION_OK_SHADER_PRESET_SAVE_CURRENT = 0,
+   ACTION_OK_SHADER_PRESET_SAVE_GLOBAL,
    ACTION_OK_SHADER_PRESET_SAVE_CORE,
    ACTION_OK_SHADER_PRESET_SAVE_PARENT,
    ACTION_OK_SHADER_PRESET_SAVE_GAME
@@ -3499,6 +3524,9 @@ static int generic_action_ok_shader_preset_save(const char *path,
 
    switch (action_type)
    {
+      case ACTION_OK_SHADER_PRESET_SAVE_CURRENT:
+         preset_type = SHADER_PRESET_CURRENT;
+         break;
       case ACTION_OK_SHADER_PRESET_SAVE_GLOBAL:
          preset_type = SHADER_PRESET_GLOBAL;
          break;
@@ -3536,6 +3564,13 @@ static int generic_action_ok_shader_preset_save(const char *path,
    }
 
    return 0;
+}
+
+static int action_ok_shader_preset_save_current(const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   return generic_action_ok_shader_preset_save(path, label, type,
+         idx, entry_idx, ACTION_OK_SHADER_PRESET_SAVE_CURRENT);
 }
 
 static int action_ok_shader_preset_save_global(const char *path,
@@ -3952,7 +3987,7 @@ static int action_ok_remap_file_flush(const char *path,
    runloop_state_t *runloop_st = runloop_state_get_ptr();
    const char *path_remapfile  = runloop_st->name.remapfile;
    const char *remapfile       = NULL;
-   bool success                = false;
+   bool ret                    = false;
 
    msg[0] = '\0';
 
@@ -3960,7 +3995,7 @@ static int action_ok_remap_file_flush(const char *path,
    if (!string_is_empty(path_remapfile))
    {
       /* Update existing remap file */
-      success   = input_remapping_save_file(path_remapfile);
+      ret = input_remapping_save_file(path_remapfile);
       /* Get remap file name for display purposes */
       remapfile = path_basename_nocompression(path_remapfile);
    }
@@ -3969,7 +4004,7 @@ static int action_ok_remap_file_flush(const char *path,
       remapfile = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_UNKNOWN);
 
    /* Log result */
-   if (success)
+   if (ret)
    {
       /* TODO/FIXME - localize */
       RARCH_LOG(
@@ -3992,7 +4027,7 @@ static int action_ok_remap_file_flush(const char *path,
 
    runloop_msg_queue_push(msg, _len, 1, 100, true, NULL,
          MESSAGE_QUEUE_ICON_DEFAULT,
-         (success) ? MESSAGE_QUEUE_CATEGORY_SUCCESS : MESSAGE_QUEUE_CATEGORY_ERROR);
+         ret ? MESSAGE_QUEUE_CATEGORY_SUCCESS : MESSAGE_QUEUE_CATEGORY_ERROR);
 
    return 0;
 }
@@ -4042,7 +4077,7 @@ static void menu_input_st_string_cb_override_file_save_as(
       const char *label               = menu_st->input_dialog_kb_label;
       const char *msg_str             = NULL;
       int ret                         = false;
-      uint8_t msg_cat                 = MESSAGE_QUEUE_CATEGORY_INFO;
+      enum message_queue_category msg_cat = MESSAGE_QUEUE_CATEGORY_INFO;
 
       if (!string_is_empty(label))
          setting = menu_setting_find(label);
@@ -4966,14 +5001,14 @@ static int action_ok_core_updater_list(const char *path,
        *   interface */
       struct string_list *available_cores =
          play_feature_delivery_available_cores();
-      bool success                        = false;
+      bool ret                            = false;
 
       if (!available_cores)
          return -1;
 
       core_updater_list_reset(core_list);
 
-      success = core_updater_list_parse_pfd_data(
+      ret = core_updater_list_parse_pfd_data(
             core_list,
             path_dir_libretro,
             path_libretro_info,
@@ -4981,7 +5016,7 @@ static int action_ok_core_updater_list(const char *path,
 
       string_list_free(available_cores);
 
-      if (!success)
+      if (!ret)
          return -1;
 
       /* Ensure network is initialised */
@@ -5681,6 +5716,8 @@ int action_ok_close_content(const char *path, const char *label, unsigned type, 
 {
    int ret;
    struct menu_state   *menu_st = menu_state_get_ptr();
+   bool contentless_core        = false;
+
    /* Reset navigation pointer
     * > If we are returning to the quick menu, want
     *   the active entry to be 'Run' (first item in
@@ -5712,7 +5749,10 @@ int action_ok_close_content(const char *path, const char *label, unsigned type, 
 
          if (   string_is_equal(parent_label, msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB))
              || string_is_equal(parent_label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_CONTENTLESS_CORES_LIST)))
+         {
             flush_target = parent_label;
+            contentless_core = true;
+         }
       }
 
       menu_entries_flush_stack(flush_target, 0);
@@ -5724,8 +5764,17 @@ int action_ok_close_content(const char *path, const char *label, unsigned type, 
       menu_st->flags &= ~MENU_ST_FLAG_PREVENT_POPULATE;
    }
 
+   /* Single-click playlist return */
+   if (config_get_ptr()->bools.input_menu_singleclick_playlists && !contentless_core)
+   {
+      size_t new_selection = menu_st->selection_ptr;
+      menu_entries_pop_stack(&new_selection, 0, 0);
+      menu_st->selection_ptr = new_selection;
+      menu_st->flags &= ~MENU_ST_FLAG_PREVENT_POPULATE;
+   }
+
    /* Try to reload last core if loaded manually */
-   menu_state_get_ptr()->flags |= MENU_ST_FLAG_PENDING_RELOAD_CORE;
+   menu_st->flags |= MENU_ST_FLAG_PENDING_RELOAD_CORE;
 
    return ret;
 }
@@ -6461,8 +6510,7 @@ STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_music, ACTION_OK_DL_MUSIC_LIST)
 STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_explore, ACTION_OK_DL_EXPLORE_LIST)
 STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_contentless_cores, ACTION_OK_DL_CONTENTLESS_CORES_LIST)
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_save, ACTION_OK_DL_SHADER_PRESET_SAVE)
-STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_remove, ACTION_OK_DL_SHADER_PRESET_REMOVE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_manager, ACTION_OK_DL_SHADER_PRESET_MANAGER_LIST)
 STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_parameters, ACTION_OK_DL_SHADER_PARAMETERS)
 #endif
 STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_parent_directory_push, ACTION_OK_DL_PARENT_DIRECTORY_PUSH)
@@ -6648,6 +6696,9 @@ static int action_ok_open_picker(const char *path,
    return 0;
 #elif defined(OSX) && defined(HAVE_APPLE_STORE)
    osx_show_file_sheet();
+   return 0;
+#elif defined(ANDROID) && defined(HAVE_SAF)
+   android_show_saf_tree_picker();
    return 0;
 #else
    char *new_path = NULL;
@@ -7101,11 +7152,11 @@ static int generic_action_ok_dropdown_setting(const char *path, const char *labe
    switch (setting->type)
    {
       case ST_INT:
-         *setting->value.target.integer = (int32_t)(idx + setting->offset_by);
+         *setting->value.target.integer = (int32_t)((idx * setting->step) + setting->offset_by);
          break;
       case ST_UINT:
          {
-            unsigned value = (unsigned)(idx + setting->offset_by);
+            unsigned value = (unsigned)((idx * setting->step) + setting->offset_by);
             *setting->value.target.unsigned_integer = value;
          }
          break;
@@ -9005,8 +9056,8 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_VIDEO_SHADER_PARAMETERS,             action_ok_shader_parameters},
          {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PARAMETERS,      action_ok_shader_parameters},
          {MENU_ENUM_LABEL_SHADER_APPLY_CHANGES,                action_ok_shader_apply_changes},
-         {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_REMOVE,          action_ok_shader_preset_remove},
-         {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE,            action_ok_shader_preset_save},
+         {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_MANAGER,         action_ok_shader_preset_manager},
+         {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_CURRENT,    action_ok_shader_preset_save_current},
          {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_AS,         action_ok_shader_preset_save_as},
          {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_GLOBAL,     action_ok_shader_preset_save_global},
          {MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_CORE,       action_ok_shader_preset_save_core},

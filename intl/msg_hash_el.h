@@ -6,6 +6,20 @@
 #pragma warning(disable:4566)
 #endif
 
+/*
+##### NOTE FOR TRANSLATORS ####
+
+PLEASE do NOT modify any `msg_hash_*.h` files, besides `msg_hash_us.h`!
+
+Translations are handled using the localization platform Crowdin:
+https://crowdin.com/project/retroarch
+
+Translations from Crowdin are applied automatically and will overwrite
+any changes made to the other localization files.
+As a result, any submissions directly altering `msg_hash_*.h` files
+other than `msg_hash_us.h` will be rejected.
+*/
+
 /* Top-Level Menu */
 
 MSG_HASH(
@@ -70,6 +84,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_LIST,
    "Επιλέξτε ποιον πυρήνα θα χρησιμοποιήσετε."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CORE_LIST_UNLOAD,
+   "Αποφόρτωση Πυρήνα"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CORE_LIST_UNLOAD,
+   "Απελευθέρωση του φορτωμένου πυρήνα"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_CORE_LIST,
@@ -139,7 +161,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_DISABLE_KIOSK_MODE,
-   "Απενεργοποίηση λειτουργίας Kiosk (απαιτείται επανεκκίνηση)"
+   "Απενεργοποίηση λειτουργίας Kiosk"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_DISABLE_KIOSK_MODE,
@@ -504,6 +526,10 @@ MSG_HASH(
    "Απαιτούμενο API γραφικών"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CORE_INFO_CORE_PATH,
+   "Πλήρης διαδρομή αρχείου πυρήνα"
+)
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_INFO_SAVESTATE_SUPPORT_LEVEL,
    "Υποστήριξη αποθήκευσης κατάστασης"
    )
@@ -528,10 +554,6 @@ MSG_HASH(
    "Λογισμικό"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_CORE_INFO_FIRMWARE_IN_CONTENT_DIRECTORY,
-   "- Σημείωση: Το 'Αρχεία συστήματος βρίσκονται στον Κατάλογο Περιεχομένου' είναι ενεργοποιημένο."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MISSING_REQUIRED,
    "Λείπει, Απαιτείται:"
    )
@@ -550,6 +572,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_LOCK,
    "Κλείδωμα Εγκατεστημένου Πυρήνα"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CORE_LOCK,
+   "Αποτροπή τροποποίησης του εγκατεστημένου πυρήνα. Χρήση για αποφυγή ανεπιθύμητων ενημερώσεων όταν απαιτείται συγκεκριμένη έκδοση (π.χ. arcade ROM sets) ή αλλαγές στη μορφή των save states."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_SET_STANDALONE_EXEMPT,
@@ -635,6 +661,10 @@ MSG_HASH(
    "JIT διαθέσιμο"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BUNDLE_IDENTIFIER,
+   "Ταυτότητα Πακέτου"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_FRONTEND_IDENTIFIER,
    "Αναγνωριστικό λειτουργικού συστήματος"
    )
@@ -713,6 +743,30 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_SDL2_SUPPORT,
    "Υποστήριξη SDL2"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_D3D8_SUPPORT,
+   "Υποστήριξη για Direct3D 8"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_D3D9_SUPPORT,
+   "Υποστήριξη για Direct3D 9"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_D3D10_SUPPORT,
+   "Υποστήριξη για Direct3D 10"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_D3D11_SUPPORT,
+   "Υποστήριξη για Direct3D 11"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_D3D12_SUPPORT,
+   "Υποστήριξη για Direct3D 12"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GDI_SUPPORT,
+   "Υποστήριξη για GDI"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_VULKAN_SUPPORT,
@@ -795,6 +849,10 @@ MSG_HASH(
    "Υποστήριξη PulseAudio"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_PIPEWIRE_SUPPORT,
+   "Υποστήριξη για PipeWire"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_COREAUDIO_SUPPORT,
    "Υποστήριξη CoreAudio"
    )
@@ -821,6 +879,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_7ZIP_SUPPORT,
    "Υποστήριξη 7zip"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_ZSTD_SUPPORT,
+   "Υποστήριξη για Zstandard"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYLIB_SUPPORT,
@@ -873,6 +935,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_V4L2_SUPPORT,
    "Υποστήριξη Video4Linux2"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_SSL_SUPPORT,
+   "Υποστήριξη για SSL Support"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_LIBUSB_SUPPORT,
@@ -1088,6 +1154,22 @@ MSG_HASH(
    "Αποθήκευση των τρεχουσών ρυθμίσεων για διαχωρισμό αρχείου."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SAVE_AS_CONFIG,
+   "Αποθήκευση ρυθμίσεων ως"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_AS_CONFIG,
+   "Αποθήκευση τρέχουσων ρυθμίσεων σε προσαρμοσμένο αρχείο......"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SAVE_MAIN_CONFIG,
+   "Αποθήκευση κύριων ρυθμίσεων"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_MAIN_CONFIG,
+   "Αποθήκευση τρεχουσών ρυθμίσεων ως κύριες."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RESET_TO_DEFAULT_CONFIG,
    "Επαναφορά Προεπιλογών"
    )
@@ -1259,6 +1341,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CLOUD_SYNC_DESTRUCTIVE,
    "Όταν απενεργοποιηθεί, τα αρχεία μετακινούνται σε ένα φάκελο αντιγράφων ασφαλείας πριν αντικατασταθούν ή διαγραφούν."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CLOUD_SYNC_SYNC_MODE_MANUAL,
+   "Χειροκίνητο"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CLOUD_SYNC_DRIVER,
@@ -1473,6 +1559,10 @@ MSG_HASH(
    "Χρήστης"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_USER_SETTINGS,
+   "Αλλαγή ρυθμίσεων απορρήτου, λογαριασμού και ονόματος χρήστη."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DIRECTORY_SETTINGS,
    "Ευρετήρια"
    )
@@ -1529,8 +1619,56 @@ MSG_HASH(
    "Οδηγός Εισαγωγής"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_DRIVER,
+   "Οδηγός εισόδου προς χρήση. Κάποιοι οδηγοί βίντεο απαιτούν διαφορετικό οδηγό εισόδου. (Απαιτείται επανεκκίνηση)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_INPUT_DRIVER_UDEV,
+   "Ο οδηγός udev διαβάζει συμβάντα evdev για υποστήριξη πληκτρολογίου. Υποστηρίζει επίσης κλήσεις πληκτρολογίου, ποντίκια και touchpads.Σε πολλές διανομές, οι κόμβοι /dev/input είναι προσβάσιμοι μόνο από root (δικαιώματα 600). Μπορείτε να ρυθμίσετε κανόνα udev ώστε να γίνουν προσβάσιμοι και από[...]"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_INPUT_DRIVER_LINUXRAW,
+   "Ο οδηγός εισόδου linuxraw απαιτεί ενεργό TTY. Τα πλήκτρα διαβάζονται απευθείας από το TTY, καθιστώντας τον πιο απλό αλλά λιγότερο ευέλικτο από τον udev. Ποντίκια και άλλα δεν υποστηρίζονται. Χρησιμοποιεί το παλαιότερο API χειριστηρίου (/dev/input/js).*"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_INPUT_DRIVER_NO_DETAILS,
+   "Οδηγός εισόδου. Ο οδηγός βίντεο ενδέχεται να επιβάλει διαφορετικό οδηγό εισόδου."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_JOYPAD_DRIVER,
    "Χειριστήριο"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_JOYPAD_DRIVER,
+   "Οδηγός χειριστηρίου προς χρήση. (Απαιτείται επανεκκίνηση)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_DINPUT,
+   "Οδηγός χειριστηρίου DirectInput."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_HID,
+   "Οδηγός χαμηλού επιπέδου συσκευής ανθρώπινης διεπαφής."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_LINUXRAW,
+   "Πρόγραμμα οδήγησης Linux raw, χρησιμοποιεί παλαιό API joystick. Αν είναι δυνατό, χρησιμοποιήστε udev."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_PARPORT,
+   "Οδηγός Linux για χειριστήρια συνδεδεμένα σε παράλληλη θύρα μέσω ειδικών προσαρμογέων."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_SDL,
+   "Οδηγός χειριστηρίου βασισμένος στις βιβλιοθήκες SDL."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_UDEV,
+   "Οδηγός gamepad με διεπαφή udev, γενικά προτιμώμενος. Χρησιμοποιεί το τελευταίο evdev joypad API για joystick. Υποστηρίζει hotplugging και force feedback.\nΚανονικά, στα περισσότερα Linux, οι κόμβοι /dev/input είναι μόνο για root (mode 600). Μπορείτε να ρυθμίσετε κανόνα udev που επιτρέπει την πρόσβαση σε μη-root χρήστες."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_JOYPAD_DRIVER_XINPUT,
+   "Οδηγός χειριστηρίου XInput. Κυρίως για χειριστήρια Xbox."
    )
 
 MSG_HASH(
@@ -1540,6 +1678,70 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_DRIVER,
    "Οδηγός βίντεο προς χρήση."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_GL1,
+   "Πρόγραμμα οδήγησης OpenGL 1.x. Ελάχιστη απαιτούμενη έκδοση: OpenGL 1.1. Δεν έχει υποστήριξη για shaders. Προτιμήστε νεότερους OpenGL οδηγούς όπου είναι εφικτό."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_GL,
+   "Οδηγός OpenGL 2.x. Αυτός ο οδηγός επιτρέπει τη χρήση libretro GL cores επιπλέον των cores που αποδίδονται μέσω λογισμικού. Ελάχιστη απαιτούμενη έκδοση: OpenGL 2.0 ή OpenGLES 2.0. Υποστηρίζει τη μορφή shader GLSL. Χρησιμοποιήστε τον οδηγό glcore αν είναι δυνατόν."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_GL_CORE,
+   "Οδηγός OpenGL 3.x. Αυτός ο οδηγός επιτρέπει τη χρήση libretro GL cores επιπλέον των cores που αποδίδονται μέσω λογισμικού. Ελάχιστη απαιτούμενη έκδοση: OpenGL 3.2 ή OpenGLES 3.0+. Υποστηρίζει τη μορφή shader Slang."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_VULKAN,
+   "Οδηγός Vulkan. Αυτός ο οδηγός επιτρέπει τη χρήση libretro Vulkan cores επιπλέον των cores που αποδίδονται μέσω λογισμικού. Ελάχιστη απαιτούμενη έκδοση: Vulkan 1.0. Υποστηρίζει HDR και Slang shaders."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_SDL1,
+   "Οδηγός SDL 1.2 με απόδοση μέσω λογισμικού. Η απόδοση θεωρείται υποδεέστερη. Χρησιμοποιήστε τον μόνο ως έσχατη λύση."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_SDL2,
+   "Οδηγός SDL 2 με απόδοση μέσω λογισμικού. Η απόδοση των libretro cores με απόδοση μέσω λογισμικού εξαρτάται από την υλοποίηση SDL της πλατφόρμας σας."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_METAL,
+   "Οδηγός Metal για πλατφόρμες Apple. Υποστηρίζει τη μορφή shader Slang."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D8,
+   "Οδηγός Direct3D 8 χωρίς υποστήριξη shaders."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D9_CG,
+   "Οδηγός Direct3D 9 με υποστήριξη για το παλιό format shaders Cg."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D9_HLSL,
+   "Οδηγός Direct3D 9 με υποστήριξη για το format shaders HLSL."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D10,
+   "Οδηγός Direct3D 10 με υποστήριξη για το format shaders Slang."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D11,
+   "Οδηγός Direct3D 11 με υποστήριξη για HDR και το format shaders Slang."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_D3D12,
+   "Οδηγός Direct3D 12 με υποστήριξη για HDR και το format shaders Slang."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_DISPMANX,
+   "Οδηγός DispmanX. Χρησιμοποιεί το API DispmanX για την GPU Videocore IV στο Raspberry Pi 0..3. Δεν υποστηρίζει overlay ή shaders."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_WIIU,
+   "Οδηγός Wii U. Υποστηρίζει Slang shaders."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_DRIVER_SWITCH,
+   "Οδηγός Nintendo Switch. Υποστηρίζει τη μορφή shader GLSL."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_DRIVER,
@@ -1659,6 +1861,18 @@ MSG_HASH(
    "Αναστολή Προφύλαξης Οθόνης"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VIDEO_THREADED,
+   "Πολυνηματικό βίντεο"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VIDEO_THREADED,
+   "Βελτιώνει την απόδοση, αλλά αυξάνει την καθυστέρηση και τα κολλήματα στο βίντεο. Να το χρησιμοποιείτε μόνο αν δεν μπορείτε να έχετε πλήρη ταχύτητα."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_VIDEO_THREADED,
+   "Χρήση πολυνηματικού οδηγού βίντεο για βελτιωμένη απόδοση. Χρησιμοποιώντας αυτό μπορεί να βελτιωθεί η απόδοση, με πιθανό κόστος αυξημένης καθυστέρησης και περισσότερων κολλημάτων στο βίντεο."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_BLACK_FRAME_INSERTION,
    "Εισαγωγή Μαύρων Καρέ"
    )
@@ -1695,6 +1909,10 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CRT_SWITCH_X_AXIS_CENTERING,
+   "Εναλλάξτε μεταξύ αυτών των επιλογών εάν η εικόνα δεν είναι σωστά κεντραρισμένη στην οθόνη."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CRT_SWITCH_VERTICAL_ADJUST,
    "Εναλλάξτε μεταξύ αυτών των επιλογών εάν η εικόνα δεν είναι σωστά κεντραρισμένη στην οθόνη."
    )
 MSG_HASH(
@@ -3842,10 +4060,6 @@ MSG_HASH(
 /* Quick Menu > Shaders */
 
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_REMOVE,
-   "Remove shader presets of a specific type."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHADER_APPLY_CHANGES,
    "Εφαμοργή Αλλαγών"
    )
@@ -3861,13 +4075,6 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SCALE,
    "Κλίμακα"
    )
-
-/* Quick Menu > Shaders > Save */
-
-
-
-
-/* Quick Menu > Shaders > Remove */
 
 
 /* Quick Menu > Shaders > Shader Parameters */
@@ -4445,6 +4652,14 @@ MSG_HASH(
    "Ενεργοποίηση οριζόντιας απεικόνισης για το μενού. Θα επηρεάσει την απόδοση."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_CURRENT_MENU_ICON_NONE,
+   "Κανείς"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_CURRENT_MENU_ICON_NORMAL,
+   "Φυσιολογικά"
+   )
+MSG_HASH(
    MENU_ENUM_SUBLABEL_XMB_THEME,
    "Select a different theme for the icon. Changes will take effect after you restart the program."
    )
@@ -4522,6 +4737,10 @@ MSG_HASH(
 
 /* Ozone: Settings > User Interface > Appearance */
 
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_OZONE_HEADER_ICON_NONE,
+   "Κανείς"
+   )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_OZONE_HEADER_SEPARATOR_NONE,
    "Κανείς"

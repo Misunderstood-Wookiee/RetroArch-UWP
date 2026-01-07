@@ -97,8 +97,13 @@ static unsigned sw_sws_threads;
 static video_buffer_t *video_buffer;
 static tpool_t *tpool;
 
-#define FFMPEG3 ((LIBAVUTIL_VERSION_INT < (56, 6, 100)) || \
+#ifndef FFMPEG3
+#define FFMPEG3 ((LIBAVUTIL_VERSION_INT < AV_VERSION_INT(56, 6, 100)) || \
       (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 10, 100)))
+#endif
+#ifndef FFMPEG8
+#define FFMPEG8 (LIBAVCODEC_VERSION_MAJOR >= 62)
+#endif
 
 #if ENABLE_HW_ACCEL
 static enum AVHWDeviceType hw_decoder;
@@ -125,6 +130,7 @@ static ASS_Track *ass_track[MAX_STREAMS];
 static uint8_t *ass_extra_data[MAX_STREAMS];
 static size_t ass_extra_data_size[MAX_STREAMS];
 static slock_t *ass_lock;
+static void render_ass_img(AVFrame *conv_frame, ASS_Image *img);
 #endif
 
 struct attachment
@@ -834,6 +840,19 @@ void CORE_PREFIX(retro_run)(void)
                video_buffer_get_finished_slot(video_buffer, &ctx);
                pts                          = ctx->pts;
 
+#ifdef HAVE_SSA
+               double video_time = ctx->pts * av_q2d(fctx->streams[video_stream_index]->time_base);
+               slock_lock(ass_lock);
+               if (ass_render && ctx->ass_track_active)
+               {
+                  int change     = 0;
+                  ASS_Image *img = ass_render_frame(ass_render, ctx->ass_track_active,
+                     1000 * video_time, &change);
+                  render_ass_img(ctx->target, img);
+               }
+               slock_unlock(ass_lock);
+#endif
+
 #ifdef HAVE_OPENGLES
                data                         = video_frame_temp_buffer;
 #else
@@ -854,6 +873,7 @@ void CORE_PREFIX(retro_run)(void)
 #ifndef HAVE_OPENGLES
                glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 #endif
+
                glBindTexture(GL_TEXTURE_2D, frames[1].tex);
 #if defined(HAVE_OPENGLES)
                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
@@ -988,12 +1008,15 @@ static enum AVPixelFormat init_hw_decoder(struct AVCodecContext *ctx,
                                     const enum AVHWDeviceType type,
                                     const enum AVPixelFormat *pix_fmts)
 {
+#if !FFMPEG3
+   int i;
+#endif
    int ret = 0;
    enum AVPixelFormat decoder_pix_fmt = AV_PIX_FMT_NONE;
    const AVCodec *codec = avcodec_find_decoder(fctx->streams[video_stream_index]->codecpar->codec_id);
 
 #if !FFMPEG3
-   for (int i = 0;; i++)
+   for (i = 0;; i++)
    {
       const AVCodecHWConfig *config = avcodec_get_hw_config(codec, i);
       if (!config)
@@ -1487,19 +1510,6 @@ static void sws_worker_thread(void *arg)
 
    ctx->pts = ctx->source->best_effort_timestamp;
 
-#ifdef HAVE_SSA
-   double video_time = ctx->pts * av_q2d(fctx->streams[video_stream_index]->time_base);
-   slock_lock(ass_lock);
-   if (ass_render && ctx->ass_track_active)
-   {
-      int change     = 0;
-      ASS_Image *img = ass_render_frame(ass_render, ctx->ass_track_active,
-            1000 * video_time, &change);
-      render_ass_img(ctx->target, img);
-   }
-   slock_unlock(ass_lock);
-#endif
-
    av_frame_unref(ctx->source);
 #if ENABLE_HW_ACCEL
    av_frame_unref(ctx->hw_source);
@@ -1902,13 +1912,26 @@ static void decode_thread(void *data)
                break;
             }
          }
+         log_cb(RETRO_LOG_DEBUG, "[FFMPEG] [ASS] Decoded subtitle packet, num_rects=%d, pkt->pts=%lld, pkt->duration=%lld, sub.start=%u, sub.end=%u\n", 
+            sub.num_rects, (long long)pkt->pts, (long long)pkt->duration, sub.start_display_time, sub.end_display_time);
 #ifdef HAVE_SSA
          for (i = 0; i < sub.num_rects; i++)
          {
             slock_lock(ass_lock);
+            ass_flush_events(ass_track_active);
             if (sub.rects[i]->ass && ass_track_active)
-               ass_process_data(ass_track_active,
-                     sub.rects[i]->ass, strlen(sub.rects[i]->ass));
+            {
+               char dialogue_line[4096];
+               
+               /* Convert packet timing from stream timebase to milliseconds */
+               double timebase_ms = av_q2d(fctx->streams[subtitle_stream]->time_base) * 1000.0;
+               long long start_time = (long long)((pkt->pts >= 0 ? pkt->pts : 0) * timebase_ms) + sub.start_display_time;
+               long long duration = (long long)(pkt->duration > 0 ? (pkt->duration * timebase_ms) : (sub.end_display_time - sub.start_display_time));
+               
+               snprintf(dialogue_line, sizeof(dialogue_line), "Dialogue: %s", sub.rects[i]->ass);
+               
+               ass_process_chunk(ass_track_active, dialogue_line, strlen(dialogue_line), start_time, duration);
+            }
             slock_unlock(ass_lock);
          }
 #endif
@@ -2088,17 +2111,28 @@ void CORE_PREFIX(retro_unload_game)(void)
 
    for (i = 0; i < MAX_STREAMS; i++)
    {
+#if FFMPEG8
+      if (sctx[i])
+         avcodec_free_context(&sctx[i]);
+      if (actx[i])
+         avcodec_free_context(&actx[i]);
+#else
       if (sctx[i])
          avcodec_close(sctx[i]);
       if (actx[i])
          avcodec_close(actx[i]);
+#endif
       sctx[i] = NULL;
       actx[i] = NULL;
    }
 
    if (vctx)
    {
+#if FFMPEG8
+      avcodec_free_context(&vctx);
+#else
       avcodec_close(vctx);
+#endif
       vctx = NULL;
    }
 

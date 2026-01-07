@@ -59,6 +59,7 @@
 #include "../frontend/frontend_driver.h"
 #include "../record/record_driver.h"
 #include "../ui/ui_companion_driver.h"
+#include "../input/input_overlay.h"
 #include "../driver.h"
 #include "../file_path_special.h"
 #include "../list_special.h"
@@ -2131,26 +2132,38 @@ void video_viewport_get_scaled_aspect2(struct video_viewport *vp,
 
    if (settings->uints.video_aspect_ratio_idx == ASPECT_RATIO_CUSTOM)
    {
-      video_viewport_t
-         *custom_vp     = &settings->video_vp_custom;
-      int padding_x     = 0;
-      int padding_y     = 0;
+      video_viewport_t *custom_vp = &settings->video_vp_custom;
 
-      x                 = custom_vp->x;
-      y                 = custom_vp->y;
+      if (custom_vp)
+      {
+         int padding_x     = 0;
+         int padding_y     = 0;
 
-      if (!y_down)
-         y              = vp->full_height - (y + custom_vp->height);
-      padding_x        += (vp_width - custom_vp->width);
-      if (padding_x < 0)
-         padding_x     *= 2;
-      padding_y         = vp_height - custom_vp->height;
-      if (padding_y < 0)
-         padding_y     *= 2;
-      vp_width          = custom_vp->width;
-      vp_height         = custom_vp->height;
-      x                += padding_x * vp_bias_x;
-      y                += padding_y * vp_bias_y;
+         x                 = custom_vp->x;
+         y                 = custom_vp->y;
+
+         if (!y_down)
+            y = -y;
+
+         padding_x         = vp_width - custom_vp->width;
+         padding_y         = vp_height - custom_vp->height;
+
+         if (padding_x < 0)
+         {
+            x -= padding_x * vp_bias_x;
+            padding_x *= 2;
+         }
+         if (padding_y < 0)
+         {
+            y -= padding_y * vp_bias_y;
+            padding_y *= 2;
+         }
+
+         vp_width          = custom_vp->width;
+         vp_height         = custom_vp->height;
+         x                += padding_x * vp_bias_x;
+         y                += padding_y * vp_bias_y;
+      }
    }
    else
    {
@@ -2188,7 +2201,7 @@ void video_viewport_get_scaled_aspect2(struct video_viewport *vp,
 }
 
 void video_driver_update_viewport(
-      struct video_viewport* vp, bool force_full, bool keep_aspect)
+      struct video_viewport* vp, bool force_full, bool keep_aspect, bool y_down)
 {
    settings_t *settings            = config_get_ptr();
    bool video_scale_integer        = settings->bools.video_scale_integer;
@@ -2200,14 +2213,78 @@ void video_driver_update_viewport(
    vp->width                       = vp->full_width;
    vp->height                      = vp->full_height;
 
+#ifdef HAVE_OVERLAY
+   /* Check if active overlay specifies viewport override.
+    * Only apply to game viewport, not UI elements (force_full=true) */
+   if (!force_full)
+   {
+      input_driver_state_t *input_st = input_state_get_ptr();
+      if (input_st && input_st->overlay_ptr && input_st->overlay_ptr->active)
+      {
+         const struct overlay *ol = input_st->overlay_ptr->active;
+         if (ol->flags & OVERLAY_HAS_VIEWPORT)
+         {
+            /* Calculate overlay's viewport bounds in pixels */
+            int ol_x      = (int)(ol->viewport.x * vp->full_width);
+            int ol_y      = (int)(ol->viewport.y * vp->full_height);
+            unsigned ol_w = (unsigned)(ol->viewport.w * vp->full_width);
+            unsigned ol_h = (unsigned)(ol->viewport.h * vp->full_height);
+            RARCH_LOG("[Overlay] Applying viewport override!\n");
+
+            if (ol->flags & OVERLAY_VIEWPORT_FILL)
+            {
+               /* Fill mode: stretch to fill overlay viewport exactly */
+               vp->x      = ol_x;
+               vp->y      = ol_y;
+               vp->width  = ol_w;
+               vp->height = ol_h;
+            }
+            else
+            {
+               /* Fit mode: preserve aspect ratio within overlay viewport */
+               float game_aspect = video_driver_get_aspect_ratio();
+               float ol_aspect   = (float)ol_w / (float)ol_h;
+
+               if (game_aspect > ol_aspect)
+               {
+                  /* Game is wider - pillarbox (bars top/bottom) */
+                  vp->width  = ol_w;
+                  vp->height = (unsigned)(ol_w / game_aspect);
+                  vp->x      = ol_x;
+                  vp->y      = ol_y + (int)(ol_h - vp->height) / 2;
+               }
+               else
+               {
+                  /* Game is taller - letterbox (bars left/right) */
+                  vp->height = ol_h;
+                  vp->width  = (unsigned)(ol_h * game_aspect);
+                  vp->x      = ol_x + (int)(ol_w - vp->width) / 2;
+                  vp->y      = ol_y;
+               }
+            }
+            return;  /* Skip all other viewport calculations */
+         }
+      }
+   }
+#endif
+
    if (video_scale_integer && !force_full)
       video_viewport_get_scaled_integer(
             vp,
             vp->full_width,
             vp->full_height,
-            video_driver_aspect_ratio, keep_aspect, true);
+            video_driver_aspect_ratio, keep_aspect, y_down);
    else if (keep_aspect && !force_full)
-      video_viewport_get_scaled_aspect(vp, vp->full_width, vp->full_height, true);
+   {
+      /* Calculate device_aspect, using translate_aspect if available
+       * (e.g. for SD TV detection on Raspberry Pi) */
+      float device_aspect = (float)vp->full_width / vp->full_height;
+      if (video_st->current_video_context.translate_aspect)
+         device_aspect = video_st->current_video_context.translate_aspect(
+               video_st->context_data, vp->full_width, vp->full_height);
+      video_viewport_get_scaled_aspect2(vp, vp->full_width, vp->full_height,
+            y_down, device_aspect, video_driver_aspect_ratio);
+   }
 }
 
 void video_driver_restore_cached(void *settings_data)
@@ -2461,19 +2538,29 @@ void video_viewport_get_scaled_integer(struct video_viewport *vp,
    if (video_aspect_ratio_idx == ASPECT_RATIO_CUSTOM)
    {
       struct video_viewport *custom_vp = &settings->video_vp_custom;
+
       if (custom_vp)
       {
          x         = custom_vp->x;
          y         = custom_vp->y;
 
          if (!y_down)
-            y      = vp->height - (y + custom_vp->height);
+            y = -y;
+
          padding_x = width - custom_vp->width;
-         if (padding_x < 0)
-            padding_x *= 2;
          padding_y = height - custom_vp->height;
+
+         if (padding_x < 0)
+         {
+            x -= padding_x * vp_bias_x;
+            padding_x *= 2;
+         }
          if (padding_y < 0)
+         {
+            y -= padding_y * vp_bias_y;
             padding_y *= 2;
+         }
+
          width     = custom_vp->width;
          height    = custom_vp->height;
       }
@@ -2489,46 +2576,44 @@ void video_viewport_get_scaled_integer(struct video_viewport *vp,
          uint8_t max_scale_w = 1;
          uint8_t max_scale_h = 1;
 
-         /* Overscale if less screen is lost by cropping instead of empty added by underscale */
+         /* Overscale if only overscan or a small number of rows get cropped.
+          * Otherwise, underscale if the smallest margin doesn't exceed 12%.
+          * Otherwise, fall back to non-integer scaling. */
          if (scaling == VIDEO_SCALE_INTEGER_SCALING_SMART)
          {
-            unsigned overscale_w  = (width / content_width) + !!(width % content_width);
-            unsigned underscale_w = (width / content_width);
-            unsigned overscale_h  = (height / content_height) + !!(height % content_height);
-            unsigned underscale_h = (height / content_height);
-            int overscale_w_diff  = (content_width * overscale_w) - width;
-            int underscale_w_diff = width - (content_width * underscale_w);
-            int overscale_h_diff  = (content_height * overscale_h) - height;
-            int underscale_h_diff = height - (content_height * underscale_h);
-            int scale_h_diff      = overscale_h_diff - underscale_h_diff;
+            unsigned max_scale_w  = width / content_width;
+            unsigned underscale_h = height / content_height;
+            /* Always check if the next integer factor results in a usable
+             * overscale even if the underscale factor already fills the screen.
+             * This is particularly relevant when scaling 240p content to 4k -
+             * a x9 scale will fill the height, but a x10 overscale will only
+             * crop overscan and fills more of the screen. */
+            unsigned overscale_h  = underscale_h + 1;
+            unsigned max_scale_h  = underscale_h;
+            /* This is the minimum amount content that must be shown in order
+             * for overscan to be used.
+             *
+             * Handhelds don't have overscan, but there are noteworthy cases
+             * where overscaling crops so few pixels that it's worth allowing:
+             * - Atari Lynx @ 800p
+             * - GBA @ 1080p or 4k
+             * - PSP @ 800p, 1080p or 4k
+             * 6 pixels has no special significance, it's simply the smallest
+             * value that covers all of the above cases. */
+            unsigned overscale_min_height = content_height - 6;
+            /* Overscale 240p content if only the overscan area gets cropped.
+             * The core may have applied some cropping, or the emulated console
+             * may not use all 240 lines, so the content height may be lower.
+             * 192 is 80% of 240, and is the title safe area used by Nintendo
+             * for NES development. See https://www.nesdev.org/wiki/Overscan */
+            if (192 <= content_height && content_height <= 240)
+               overscale_min_height = 192;
+            /* Use the 240p thresholds for 480p, just doubled. */
+            else if (192 * 2 <= content_height && content_height <= 480)
+               overscale_min_height = 192 * 2;
 
-            max_scale_w = underscale_w;
-            max_scale_h = underscale_h;
-
-            /* Prefer nearest scale */
-            if (overscale_w_diff <= underscale_w_diff)
-               max_scale_w = overscale_w;
-
-            if (overscale_h_diff <= underscale_h_diff)
+            if (height / overscale_h >= overscale_min_height)
                max_scale_h = overscale_h;
-
-            /* Limit width overscale */
-            if (max_scale_w * content_width >= width + ((int)content_width / 2))
-               max_scale_w = underscale_w;
-
-            /* Allow overscale when it is close enough */
-            if (scale_h_diff > 0 && scale_h_diff < 64)
-               max_scale_h = overscale_h;
-            /* Overscale will be too much even if it is closer */
-            else if ((scale_h_diff < -140 && scale_h_diff >= (int)-content_height / 2)
-                  || (scale_h_diff < -30 && scale_h_diff > -50)
-                  || (scale_h_diff > 20))
-               max_scale_h = underscale_h;
-
-            /* Sensible limiting for small sources */
-            if (content_height <= 200)
-               max_scale_h = underscale_h;
-
             max_scale = MIN(max_scale_w, max_scale_h);
          }
          else if (scaling == VIDEO_SCALE_INTEGER_SCALING_OVERSCALE)
@@ -2671,6 +2756,32 @@ void video_viewport_get_scaled_integer(struct video_viewport *vp,
 
          padding_x = width  - content_width  * (max_scale_w + (half_w * 0.5f));
          padding_y = height - content_height * (max_scale_h + (half_h * 0.5f));
+
+         if (scaling == VIDEO_SCALE_INTEGER_SCALING_SMART)
+         {
+            /* Final step: check if the underscaling margins are too large.
+             *
+             * Sometimes there's no reasonable integer scale that can be used,
+             * such as when scaling 480p to 720p. Overscaling would crop 25% of
+             * the content height, but underscaling would only use 2/3 of the
+             * display's height.
+             *
+             * A threshold of 88% utilization (i.e. 12% margin) captures the
+             * majority of underscaling scenarios for HD resolutions while
+             * keeping the margins relatively small. Noteworthy use cases that
+             * straddle this cutoff include: GBA scaled to 720p; Nintendo DS
+             * scaled to 1080p; and 480p content scaled to 1080p. Past this,
+             * noticeable jumps in margin size would be needed to capture a
+             * relatively small number of additional use cases.
+             * TODO: Make this threshold configurable. */
+            float width_utilization  = (float)(width  - padding_x) / width;
+            float height_utilization = (float)(height - padding_y) / height;
+            if (MAX(height_utilization, width_utilization) < 0.88)
+            {
+               video_viewport_get_scaled_aspect(vp, width, height, y_down);
+               return;
+            }
+         }
 
          /* Use regular scaling if overscale is unreasonable */
          if (     padding_x <= (int)-video_st->av_info.geometry.base_width

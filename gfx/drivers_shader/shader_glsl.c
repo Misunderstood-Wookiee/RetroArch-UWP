@@ -319,7 +319,7 @@ static bool gl_glsl_load_binary_shader(GLuint shader, char *save_path)
       shader_size=ftell (shader_binary);
       fseek(shader_binary, 0, SEEK_SET);
 
-      shader_data = malloc(shader_size);
+      shader_data = (char*)malloc(shader_size);
       fread(shader_data, shader_size, 1, shader_binary);
       fclose(shader_binary);
 
@@ -345,7 +345,7 @@ static void gl_glsl_dump_shader(GLuint shader, char *save_path)
    glGetShaderiv(shader, 0x8b89, &length);
 
    bufferSize   = length;
-   shaderBinary = malloc(bufferSize);
+   shaderBinary = (void*)malloc(bufferSize);
 
    memset(shaderBinary, 0, bufferSize);
 
@@ -376,22 +376,27 @@ static bool gl_glsl_compile_shader(glsl_shader_data_t *glsl,
          strtoul(existing_version + 8, (char**)&program, 10);
 
 #ifdef HAVE_OPENGLES
-      if (version_no >= 130 && version_no < 330)
+      if (gl_check_capability(GL_CAPS_GLES3_SUPPORTED))
       {
-         version_extra = " es";
-         version_no    = 300;
+         if (version_no >= 130 && version_no < 330)
+         {
+            version_extra = " es";
+            version_no    = 300;
+         }
+         else if (version_no == 330)
+         {
+            version_extra = " es";
+            version_no    = 310;
+         }
+         else if (version_no > 330)
+         {
+            version_extra = " es";
+            version_no    = 320;
+         }
+         else version_no  = 100;
       }
-      else if (version_no == 330)
-      {
-         version_extra = " es";
-         version_no    = 310;
-      }
-      else if (version_no > 330)
-      {
-         version_extra = " es";
-         version_no    = 320;
-      }
-      else version_no  = 100;
+      /* Avoid versions that definitely aren't supported. */
+      else version_no     = 100;
 #endif
       snprintf(version,
             sizeof(version), "#version %u%s\n", version_no, version_extra);
@@ -402,21 +407,12 @@ static bool gl_glsl_compile_shader(glsl_shader_data_t *glsl,
       unsigned version_no = 0;
       unsigned gl_ver     = glsl_major * 100 + glsl_minor * 10;
 
-      switch (gl_ver)
-      {
-         case 300:
-            version_no = 130;
-            break;
-         case 310:
-            version_no = 140;
-            break;
-         case 320:
-            version_no = 150;
-            break;
-         default:
-            version_no = gl_ver;
-            break;
-      }
+      if (gl_ver >= 300)
+         version_no = 130;
+      else if (gl_ver >= 210)
+         version_no = 120;
+      else
+         version_no = 110;
 
       snprintf(version, sizeof(version), "#version %u\n", version_no);
       RARCH_LOG("[GLSL] Using GLSL version %u.\n", version_no);
@@ -444,13 +440,6 @@ static bool gl_glsl_compile_shader(glsl_shader_data_t *glsl,
 
    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
    gl_glsl_print_shader_log(shader);
-
-#if 0
-#if defined(ORBIS)
-   if (status == GL_TRUE)
-      gl_glsl_dump_shader(shader, save_path);
-#endif
-#endif
 
    return status == GL_TRUE;
 }
@@ -895,7 +884,12 @@ static void gl_glsl_init_menu_shaders(void *data)
    shader_prog_info.vertex = stock_vertex_xmb_ribbon_modern;
    shader_prog_info.fragment = stock_fragment_xmb;
 #else
-   if (gl_query_extension("GL_OES_standard_derivatives"))
+   if (gl_check_capability(GL_CAPS_GLES3_SUPPORTED))
+   {
+      shader_prog_info.vertex = stock_vertex_xmb_ribbon_modern;
+      shader_prog_info.fragment = core_stock_fragment_xmb;
+   }
+   else if (gl_query_extension("GL_OES_standard_derivatives"))
    {
       shader_prog_info.vertex = glsl_core ? stock_vertex_xmb_ribbon_modern : stock_vertex_xmb_ribbon_legacy;
       shader_prog_info.fragment = glsl_core ? core_stock_fragment_xmb : stock_fragment_xmb;
